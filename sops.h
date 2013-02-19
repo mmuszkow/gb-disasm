@@ -1,4 +1,7 @@
-#pragma once
+#ifndef __GB_DASM_SOPS_H__
+#define __GB_DASM_SOPS_H__
+
+/** sops.h: Operations sorted by address. Sorted linked list. */
 
 /** This operation is destination of a jump instruction. */
 #define OP_FLAG_JMP_ADDR	0x01
@@ -7,11 +10,17 @@
 
 /** Operation. */
 typedef struct op {
+    /** Offset in ROM. */
 	uint32_t	off;
+	/** Operation name and parameters. */
 	char		name[32];	
+	/** Operation binary code. */
 	uint8_t		code[3];
+	/** Operation binary code length in bytes, max 3. */
 	uint8_t		len;
+	/** Flags, used for labelling. */
 	uint8_t		flags;
+	/** Linked list. */
 	struct op*	next;
 } op;
 
@@ -28,8 +37,6 @@ op* op_create(uint32_t off, const uint8_t* code, uint8_t len, const char* name) 
 	oper->next = NULL;
 	return oper;
 }
-
-/** Operations sorted by address. Sorted linked list. */
 
 void sops_free(op* head) {
 	if(head) {
@@ -98,6 +105,7 @@ void sops_set_flag(op* head, uint32_t addr, uint8_t flag) {
 	}
 }
 
+/** Hex dump. */
 void sops_dump(op* head, FILE* f) {
 	op* tmp = head;
 	while(tmp) {
@@ -120,6 +128,7 @@ void sops_dump(op* head, FILE* f) {
 	}
 }
 
+/** Disassembled code. TODO: tbd */
 void sops_asm(op* head, FILE* f) {
 	op* tmp = head;
 	uint32_t prev = 0;
@@ -142,3 +151,6 @@ void sops_asm(op* head, FILE* f) {
 		tmp = tmp->next;
 	}
 }
+
+#endif
+

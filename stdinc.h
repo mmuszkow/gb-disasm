@@ -1,4 +1,10 @@
-#pragma once
+#ifndef __GB_DASM_STDINC_H__
+#define __GB_DASM_STDINC_H__
+
+/* stdinc.h: standard includes. */
+
+#include <stdlib.h>
+#include <string.h>
 
 #include <cstdio>
 #include <string>
@@ -9,3 +15,6 @@
 typedef unsigned char	uint8_t;
 typedef unsigned short	uint16_t;
 typedef unsigned int	uint32_t;
+
+#endif
+

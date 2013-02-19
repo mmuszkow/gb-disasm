@@ -1,4 +1,7 @@
-#pragma once
+#ifndef __GB_DASM_HEADER_H__
+#define __GB_DASM_HEADER_H__
+
+/* header.h: GameBoy ROM header. */
 
 #include "stdinc.h"
 
@@ -127,3 +130,6 @@ uint8_t header_checksum(cart_header* header) {
 	for(i=0x134; i<=0x14C; i++) cs = cs-raw[i]-1;
 	return cs;
 }
+
+#endif
+
