@@ -5,8 +5,8 @@
 
 /** Bank and pc state after return from control instruction. */
 typedef struct state {
-	uint16_t	pc;
-    int			bank;
+    uint16_t    pc;
+    int            bank;
     struct state* prev;
 } state;
 

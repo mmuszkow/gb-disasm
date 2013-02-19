@@ -4,255 +4,255 @@
 #include "state.h"
 
 /*
-	$FFFF 	        Interrupt Enable Flag
-	$FF80-$FFFE     Zero Page - 127 bytes
-	$FF00-$FF7F     Hardware I/O Registers
-	$FEA0-$FEFF     Unusable Memory
-	$FE00-$FE9F     OAM - Object Attribute Memory
-	$E000-$FDFF     Echo RAM - Reserved, Do Not Use
-	$D000-$DFFF     Internal RAM - Bank 1-7 (switchable - CGB only)
-	$C000-$CFFF     Internal RAM - Bank 0 (fixed)
-	$A000-$BFFF     Cartridge RAM (If Available)
-	$9C00-$9FFF     BG Map Data 2
-	$9800-$9BFF     BG Map Data 1
-	$8000-$97FF     Character RAM
-	$4000-$7FFF     Cartridge ROM - Switchable Banks 1-xx
-	$0150-$3FFF     Cartridge ROM - Bank 0 (fixed)
-	$0100-$014F     Cartridge Header Area
-	$0000-$00FF     Restart and Interrupt Vectors
+    $FFFF           Interrupt Enable Flag
+    $FF80-$FFFE     Zero Page - 127 bytes
+    $FF00-$FF7F     Hardware I/O Registers
+    $FEA0-$FEFF     Unusable Memory
+    $FE00-$FE9F     OAM - Object Attribute Memory
+    $E000-$FDFF     Echo RAM - Reserved, Do Not Use
+    $D000-$DFFF     Internal RAM - Bank 1-7 (switchable - CGB only)
+    $C000-$CFFF     Internal RAM - Bank 0 (fixed)
+    $A000-$BFFF     Cartridge RAM (If Available)
+    $9C00-$9FFF     BG Map Data 2
+    $9800-$9BFF     BG Map Data 1
+    $8000-$97FF     Character RAM
+    $4000-$7FFF     Cartridge ROM - Switchable Banks 1-xx
+    $0150-$3FFF     Cartridge ROM - Bank 0 (fixed)
+    $0100-$014F     Cartridge Header Area
+    $0000-$00FF     Restart and Interrupt Vectors
 */
 
 
 /* GLOBALS - start */
 
 /** ROM raw content. */
-rom*		r;
+rom*        r;
 /** MBC type. */
-uint8_t		mbc;
+uint8_t     mbc;
 
 /** Temporary buffer for formatting. */
-char		tmp[128];
+char        tmp[128];
 
 /** Current memory bank. */
-int			bank;
+int         bank;
 /** Program counter. */
-uint16_t	pc;
+uint16_t    pc;
 /** Register A. */
-uint8_t		a;
+uint8_t     a;
 /** 0xFF00-0xFFFF used for LDH operation. TODO: check what LDH really does */
 uint8_t     hmem[0xFF];
 
 /** Operations list. */
-op*						sops;
+op*                     sops;
 /** When branching, state to set back when returning. */
 state*                  top;
 /** Adresses for jmps and calls, used for labelling. TODO: replace with ANSI C container */
-std::vector<uint32_t>	jmp_addr;
-std::vector<uint32_t>	call_addr;
+std::vector<uint32_t>   jmp_addr;
+std::vector<uint32_t>   call_addr;
 
 /** Physical address mapping. */
 uint32_t phy(uint16_t addr) {
-	/* ROM only */
-	if(mbc == 0x00 || mbc == 0x08 || mbc == 0x09)
-		return addr;
-	/* TODO: for the moment we don't check the mbc, and threat MBC1, MBC3 and MBC5 equally */
-	if(addr < 0x4000) return addr;
-	return ((bank-1) * 0x4000) + addr;
+    /* ROM only */
+    if(mbc == 0x00 || mbc == 0x08 || mbc == 0x09)
+        return addr;
+    /* TODO: for the moment we don't check the mbc, and threat MBC1, MBC3 and MBC5 equally */
+    if(addr < 0x4000) return addr;
+    return ((bank-1) * 0x4000) + addr;
 }
 
 /** Conditional jump #1. */
 void jmp(uint16_t addr) {
-	if(addr < 0x8000 && phy(addr) < r->total) {
-	    top = state_push(top, pc + 3, bank);
-		pc = addr;
-	} else {
-		printf("[0x.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
-		    pc, addr, phy(addr));
-		pc += 3;
-	}
+    if(addr < 0x8000 && phy(addr) < r->total) {
+        top = state_push(top, pc + 3, bank);
+        pc = addr;
+    } else {
+        printf("[0x.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
+            pc, addr, phy(addr));
+        pc += 3;
+    }
 }
 
 /** Conditional jump #2. */
 void jmp(uint8_t addr) {
-	uint16_t new_pc = pc + ((char)addr) + 2;
-	if(new_pc < 0x8000) {
+    uint16_t new_pc = pc + ((char)addr) + 2;
+    if(new_pc < 0x8000) {
         top = state_push(top, pc + 2, bank);
-		pc = new_pc;
-	} else {
-		printf("[0x.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
-		    pc, new_pc, phy(new_pc));
-		pc += 2;
-	}
+        pc = new_pc;
+    } else {
+        printf("[0x.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
+            pc, new_pc, phy(new_pc));
+        pc += 2;
+    }
 }
 
 /** Unconditional jump #1. */
 void jmpu(uint16_t addr) {
-	if(addr < 0x8000 && phy(addr) < r->total)
-		pc = addr;
-	else {
-		printf("[0x.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
-		    pc, addr, phy(addr));
-		pc = 0x100;
-	}
+    if(addr < 0x8000 && phy(addr) < r->total)
+        pc = addr;
+    else {
+        printf("[0x.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
+            pc, addr, phy(addr));
+        pc = 0x100;
+    }
 }
 
 /** Unconditional jump #2. */
 void jmpu(uint8_t addr) {
-	uint16_t new_pc = pc + ((char)addr) + 2;
-	if(new_pc < 0x8000 && phy(new_pc) < r->total)
-		pc = new_pc;
-	else {
-		printf("[0x.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
-		    pc, new_pc, phy(new_pc));
-		pc = 0x100;
-	}
+    uint16_t new_pc = pc + ((char)addr) + 2;
+    if(new_pc < 0x8000 && phy(new_pc) < r->total)
+        pc = new_pc;
+    else {
+        printf("[0x.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
+            pc, new_pc, phy(new_pc));
+        pc = 0x100;
+    }
 }
 
 /** Return from call or jump. */
 void ret() {
-    pc = top->pc;	    
-	bank = top->bank;
-	top = state_pop(top);
+    pc = top->pc;        
+    bank = top->bank;
+    top = state_pop(top);
 }
 
 /** No-arg operator */
 op* op_0(const char* opname) {
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 1, opname);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 1, opname);
 }
 
 op* op_0_2(const char* opname) {
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 2, opname);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 2, opname);
 }
 
 /* Adresses as right arg */
 op* op_r(const char* opname, uint16_t addr) {
-	sprintf(tmp, "%s,$%.4X", opname, addr);
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
+    sprintf(tmp, "%s,$%.4X", opname, addr);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
 }
 
 op* op_rb(const char* opname, uint16_t addr) {
-	sprintf(tmp, "%s,($%.4X)", opname, addr);
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
+    sprintf(tmp, "%s,($%.4X)", opname, addr);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
 }
 
 op* op_r(const char* opname, uint8_t addr) {
-	sprintf(tmp, "%s,$%.2X", opname, addr);
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
+    sprintf(tmp, "%s,$%.2X", opname, addr);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
 op* op_rb(const char* opname, uint8_t addr) {
-	sprintf(tmp, "%s,($%.2X)", opname, addr);
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
+    sprintf(tmp, "%s,($%.2X)", opname, addr);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
 /* Adresses as left arg */
 op* op_l(const char* opname, uint16_t addr, const char* right) {
-	sprintf(tmp, "%s $%.4X%s", opname, addr, right);
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
+    sprintf(tmp, "%s $%.4X%s", opname, addr, right);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
 }
 
 op* op_lb(const char* opname, uint16_t addr, const char* right) {
-	sprintf(tmp, "%s ($%.4X)%s", opname, addr, right);
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
+    sprintf(tmp, "%s ($%.4X)%s", opname, addr, right);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
 }
 
 op* op_l(const char* opname, uint8_t addr, const char* right) {
-	sprintf(tmp, "%s $%.2X%s", opname, addr, right);
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
+    sprintf(tmp, "%s $%.2X%s", opname, addr, right);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
 op* op_lb(const char* opname, uint8_t addr, const char* right) {
-	sprintf(tmp, "%s ($%.2X)%s", opname, addr, right);
-	return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
+    sprintf(tmp, "%s ($%.2X)%s", opname, addr, right);
+    return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
 void print_dump(FILE* f) {
-	for(unsigned int i=0; i<jmp_addr.size(); i++) {
-		sops_set_flag(sops, jmp_addr[i], OP_FLAG_JMP_ADDR);
-	}
-	for(unsigned int i=0; i<call_addr.size(); i++) {
-		sops_set_flag(sops, jmp_addr[i], OP_FLAG_JMP_ADDR);
-	}
-	sops_dump(sops, f);		
+    for(unsigned int i=0; i<jmp_addr.size(); i++) {
+        sops_set_flag(sops, jmp_addr[i], OP_FLAG_JMP_ADDR);
+    }
+    for(unsigned int i=0; i<call_addr.size(); i++) {
+        sops_set_flag(sops, jmp_addr[i], OP_FLAG_JMP_ADDR);
+    }
+    sops_dump(sops, f);        
 }
 
 void print_dump(const char* file_name) {
-	FILE* f = fopen(file_name, "w");
-	if(f) {
-		print_dump(f);
-		fclose(f);
-	}
+    FILE* f = fopen(file_name, "w");
+    if(f) {
+        print_dump(f);
+        fclose(f);
+    }
 }
 
 void print_dump() {
-	print_dump(stdout);
+    print_dump(stdout);
 }
 
 /* TODO: printing asm code is definetely not finished */
 void print_asm(FILE* f) {
-	for(unsigned int i=0; i<jmp_addr.size(); i++) {
-		sops_set_flag(sops, jmp_addr[i], OP_FLAG_JMP_ADDR);
-	}
-	for(unsigned int i=0; i<call_addr.size(); i++) {
-		sops_set_flag(sops, jmp_addr[i], OP_FLAG_JMP_ADDR);
-	}
-	sops_asm(sops, f);	
+    for(unsigned int i=0; i<jmp_addr.size(); i++) {
+        sops_set_flag(sops, jmp_addr[i], OP_FLAG_JMP_ADDR);
+    }
+    for(unsigned int i=0; i<call_addr.size(); i++) {
+        sops_set_flag(sops, jmp_addr[i], OP_FLAG_JMP_ADDR);
+    }
+    sops_asm(sops, f);    
 }
 
 void print_asm(const char* file_name) {
-	FILE* f = fopen(file_name, "w");
-	if(f) {
-		print_asm(f);
-		fclose(f);
-	}
+    FILE* f = fopen(file_name, "w");
+    if(f) {
+        print_asm(f);
+        fclose(f);
+    }
 }
 
 void print_asm() {
-	print_asm(stdout);
+    print_asm(stdout);
 }
 
 /** Remember the times when you put everything in main? They come back! */
 int main(int argc, char** argv) {
-	uint8_t		addr8;
-	uint16_t	addr16;
+    uint8_t     addr8;
+    uint16_t    addr16;
 
-	if(argc != 2) {
-		printf("Usage: %s <ROM>\n", argv[0]);
-		return -1;
-	}
-	
-	r = rom_load(argv[1]);
-	if(!r) {
-		puts("Could not load file");
-		return -2;
-	}
+    if(argc != 2) {
+        printf("Usage: %s <ROM>\n", argv[0]);
+        return -1;
+    }
+    
+    r = rom_load(argv[1]);
+    if(!r) {
+        puts("Could not load file");
+        return -2;
+    }
 
-	rom_info(r);
-	
-   	sops = NULL;
-	top = NULL;
+    rom_info(r);
+    
+    sops = NULL;
+    top = NULL;
 
-	/* Start address is always 0x100 */
-	pc = 0x100;
-	/* Bank 0 (default) == Bank 1 */
-	bank = 1;
+    /* Start address is always 0x100 */
+    pc = 0x100;
+    /* Bank 0 (default) == Bank 1 */
+    bank = 1;
 
-	while(1) {
-	    /* Do not visit same instruction twice */
-		if(sops_contains(sops, phy(pc))) {
-		    /* Check if we have any other possible branches to follow */
-	        if(top) {
-				pc = top->pc;
-				bank = top->bank;
+    while(1) {
+        /* Do not visit same instruction twice */
+        if(sops_contains(sops, phy(pc))) {
+            /* Check if we have any other possible branches to follow */
+            if(top) {
+                pc = top->pc;
+                bank = top->bank;
                 top = state_pop(top);
-	        } else {
-	            puts("Finished succesfully");
-	            goto finish;
+            } else {
+                puts("Finished succesfully");
+                goto finish;
             }
         }            
            
-		/* big switch interpreting the operations */
-		switch(r->raw[phy(pc)]) {
+        /* big switch interpreting the operations */
+        switch(r->raw[phy(pc)]) {
             /* AUTOGENERATED - look at generator.py */
             /* NOP */
             case 0x0:
@@ -1307,1028 +1307,1028 @@ int main(int argc, char** argv) {
                 switch(r->raw[phy(pc+1)]) {
                 /* RLC B */
                 case 0x0:
-	                sops = sops_add(sops, op_0_2("RLC B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RLC B"));
+                    break;
                 /* RLC C */
                 case 0x1:
-	                sops = sops_add(sops, op_0_2("RLC C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RLC C"));
+                    break;
                 /* RLC D */
                 case 0x2:
-	                sops = sops_add(sops, op_0_2("RLC D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RLC D"));
+                    break;
                 /* RLC E */
                 case 0x3:
-	                sops = sops_add(sops, op_0_2("RLC E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RLC E"));
+                    break;
                 /* RLC H */
                 case 0x4:
-	                sops = sops_add(sops, op_0_2("RLC H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RLC H"));
+                    break;
                 /* RLC L */
                 case 0x5:
-	                sops = sops_add(sops, op_0_2("RLC L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RLC L"));
+                    break;
                 /* RLC (HL) */
                 case 0x6:
-	                sops = sops_add(sops, op_0_2("RLC (HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RLC (HL)"));
+                    break;
                 /* RLC A */
                 case 0x7:
-	                sops = sops_add(sops, op_0_2("RLC A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RLC A"));
+                    break;
                 /* RRC B */
                 case 0x8:
-	                sops = sops_add(sops, op_0_2("RRC B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RRC B"));
+                    break;
                 /* RRC C */
                 case 0x9:
-	                sops = sops_add(sops, op_0_2("RRC C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RRC C"));
+                    break;
                 /* RRC D */
                 case 0xa:
-	                sops = sops_add(sops, op_0_2("RRC D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RRC D"));
+                    break;
                 /* RRC E */
                 case 0xb:
-	                sops = sops_add(sops, op_0_2("RRC E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RRC E"));
+                    break;
                 /* RRC H */
                 case 0xc:
-	                sops = sops_add(sops, op_0_2("RRC H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RRC H"));
+                    break;
                 /* RRC L */
                 case 0xd:
-	                sops = sops_add(sops, op_0_2("RRC L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RRC L"));
+                    break;
                 /* RRC (HL) */
                 case 0xe:
-	                sops = sops_add(sops, op_0_2("RRC (HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RRC (HL)"));
+                    break;
                 /* RRC A */
                 case 0xf:
-	                sops = sops_add(sops, op_0_2("RRC A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RRC A"));
+                    break;
                 /* RL B */
                 case 0x10:
-	                sops = sops_add(sops, op_0_2("RL B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RL B"));
+                    break;
                 /* RL C */
                 case 0x11:
-	                sops = sops_add(sops, op_0_2("RL C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RL C"));
+                    break;
                 /* RL D */
                 case 0x12:
-	                sops = sops_add(sops, op_0_2("RL D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RL D"));
+                    break;
                 /* RL E */
                 case 0x13:
-	                sops = sops_add(sops, op_0_2("RL E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RL E"));
+                    break;
                 /* RL H */
                 case 0x14:
-	                sops = sops_add(sops, op_0_2("RL H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RL H"));
+                    break;
                 /* RL L */
                 case 0x15:
-	                sops = sops_add(sops, op_0_2("RL L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RL L"));
+                    break;
                 /* RL (HL) */
                 case 0x16:
-	                sops = sops_add(sops, op_0_2("RL (HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RL (HL)"));
+                    break;
                 /* RL A */
                 case 0x17:
-	                sops = sops_add(sops, op_0_2("RL A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RL A"));
+                    break;
                 /* RR B */
                 case 0x18:
-	                sops = sops_add(sops, op_0_2("RR B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RR B"));
+                    break;
                 /* RR C */
                 case 0x19:
-	                sops = sops_add(sops, op_0_2("RR C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RR C"));
+                    break;
                 /* RR D */
                 case 0x1a:
-	                sops = sops_add(sops, op_0_2("RR D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RR D"));
+                    break;
                 /* RR E */
                 case 0x1b:
-	                sops = sops_add(sops, op_0_2("RR E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RR E"));
+                    break;
                 /* RR H */
                 case 0x1c:
-	                sops = sops_add(sops, op_0_2("RR H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RR H"));
+                    break;
                 /* RR L */
                 case 0x1d:
-	                sops = sops_add(sops, op_0_2("RR L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RR L"));
+                    break;
                 /* RR (HL) */
                 case 0x1e:
-	                sops = sops_add(sops, op_0_2("RR (HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RR (HL)"));
+                    break;
                 /* RR A */
                 case 0x1f:
-	                sops = sops_add(sops, op_0_2("RR A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RR A"));
+                    break;
                 /* SLA B */
                 case 0x20:
-	                sops = sops_add(sops, op_0_2("SLA B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SLA B"));
+                    break;
                 /* SLA C */
                 case 0x21:
-	                sops = sops_add(sops, op_0_2("SLA C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SLA C"));
+                    break;
                 /* SLA D */
                 case 0x22:
-	                sops = sops_add(sops, op_0_2("SLA D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SLA D"));
+                    break;
                 /* SLA E */
                 case 0x23:
-	                sops = sops_add(sops, op_0_2("SLA E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SLA E"));
+                    break;
                 /* SLA H */
                 case 0x24:
-	                sops = sops_add(sops, op_0_2("SLA H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SLA H"));
+                    break;
                 /* SLA L */
                 case 0x25:
-	                sops = sops_add(sops, op_0_2("SLA L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SLA L"));
+                    break;
                 /* SLA (HL) */
                 case 0x26:
-	                sops = sops_add(sops, op_0_2("SLA (HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SLA (HL)"));
+                    break;
                 /* SLA A */
                 case 0x27:
-	                sops = sops_add(sops, op_0_2("SLA A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SLA A"));
+                    break;
                 /* SRA B */
                 case 0x28:
-	                sops = sops_add(sops, op_0_2("SRA B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRA B"));
+                    break;
                 /* SRA C */
                 case 0x29:
-	                sops = sops_add(sops, op_0_2("SRA C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRA C"));
+                    break;
                 /* SRA D */
                 case 0x2a:
-	                sops = sops_add(sops, op_0_2("SRA D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRA D"));
+                    break;
                 /* SRA E */
                 case 0x2b:
-	                sops = sops_add(sops, op_0_2("SRA E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRA E"));
+                    break;
                 /* SRA H */
                 case 0x2c:
-	                sops = sops_add(sops, op_0_2("SRA H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRA H"));
+                    break;
                 /* SRA L */
                 case 0x2d:
-	                sops = sops_add(sops, op_0_2("SRA L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRA L"));
+                    break;
                 /* SRA (HL) */
                 case 0x2e:
-	                sops = sops_add(sops, op_0_2("SRA (HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRA (HL)"));
+                    break;
                 /* SRA A */
                 case 0x2f:
-	                sops = sops_add(sops, op_0_2("SRA A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRA A"));
+                    break;
                 /* SWAP B */
                 case 0x30:
-	                sops = sops_add(sops, op_0_2("SWAP B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SWAP B"));
+                    break;
                 /* SWAP C */
                 case 0x31:
-	                sops = sops_add(sops, op_0_2("SWAP C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SWAP C"));
+                    break;
                 /* SWAP D */
                 case 0x32:
-	                sops = sops_add(sops, op_0_2("SWAP D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SWAP D"));
+                    break;
                 /* SWAP E */
                 case 0x33:
-	                sops = sops_add(sops, op_0_2("SWAP E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SWAP E"));
+                    break;
                 /* SWAP H */
                 case 0x34:
-	                sops = sops_add(sops, op_0_2("SWAP H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SWAP H"));
+                    break;
                 /* SWAP L */
                 case 0x35:
-	                sops = sops_add(sops, op_0_2("SWAP L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SWAP L"));
+                    break;
                 /* SWAP (HL) */
                 case 0x36:
-	                sops = sops_add(sops, op_0_2("SWAP (HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SWAP (HL)"));
+                    break;
                 /* SWAP A */
                 case 0x37:
-	                sops = sops_add(sops, op_0_2("SWAP A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SWAP A"));
+                    break;
                 /* SRL B */
                 case 0x38:
-	                sops = sops_add(sops, op_0_2("SRL B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRL B"));
+                    break;
                 /* SRL C */
                 case 0x39:
-	                sops = sops_add(sops, op_0_2("SRL C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRL C"));
+                    break;
                 /* SRL D */
                 case 0x3a:
-	                sops = sops_add(sops, op_0_2("SRL D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRL D"));
+                    break;
                 /* SRL E */
                 case 0x3b:
-	                sops = sops_add(sops, op_0_2("SRL E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRL E"));
+                    break;
                 /* SRL H */
                 case 0x3c:
-	                sops = sops_add(sops, op_0_2("SRL H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRL H"));
+                    break;
                 /* SRL L */
                 case 0x3d:
-	                sops = sops_add(sops, op_0_2("SRL L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRL L"));
+                    break;
                 /* SRL (HL) */
                 case 0x3e:
-	                sops = sops_add(sops, op_0_2("SRL (HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRL (HL)"));
+                    break;
                 /* SRL A */
                 case 0x3f:
-	                sops = sops_add(sops, op_0_2("SRL A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SRL A"));
+                    break;
                 /* BIT 0,B */
                 case 0x40:
-	                sops = sops_add(sops, op_0_2("BIT 0,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 0,B"));
+                    break;
                 /* BIT 0,C */
                 case 0x41:
-	                sops = sops_add(sops, op_0_2("BIT 0,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 0,C"));
+                    break;
                 /* BIT 0,D */
                 case 0x42:
-	                sops = sops_add(sops, op_0_2("BIT 0,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 0,D"));
+                    break;
                 /* BIT 0,E */
                 case 0x43:
-	                sops = sops_add(sops, op_0_2("BIT 0,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 0,E"));
+                    break;
                 /* BIT 0,H */
                 case 0x44:
-	                sops = sops_add(sops, op_0_2("BIT 0,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 0,H"));
+                    break;
                 /* BIT 0,L */
                 case 0x45:
-	                sops = sops_add(sops, op_0_2("BIT 0,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 0,L"));
+                    break;
                 /* BIT 0,(HL) */
                 case 0x46:
-	                sops = sops_add(sops, op_0_2("BIT 0,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 0,(HL)"));
+                    break;
                 /* BIT 0,A */
                 case 0x47:
-	                sops = sops_add(sops, op_0_2("BIT 0,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 0,A"));
+                    break;
                 /* BIT 1,B */
                 case 0x48:
-	                sops = sops_add(sops, op_0_2("BIT 1,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 1,B"));
+                    break;
                 /* BIT 1,C */
                 case 0x49:
-	                sops = sops_add(sops, op_0_2("BIT 1,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 1,C"));
+                    break;
                 /* BIT 1,D */
                 case 0x4a:
-	                sops = sops_add(sops, op_0_2("BIT 1,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 1,D"));
+                    break;
                 /* BIT 1,E */
                 case 0x4b:
-	                sops = sops_add(sops, op_0_2("BIT 1,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 1,E"));
+                    break;
                 /* BIT 1,H */
                 case 0x4c:
-	                sops = sops_add(sops, op_0_2("BIT 1,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 1,H"));
+                    break;
                 /* BIT 1,L */
                 case 0x4d:
-	                sops = sops_add(sops, op_0_2("BIT 1,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 1,L"));
+                    break;
                 /* BIT 1,(HL) */
                 case 0x4e:
-	                sops = sops_add(sops, op_0_2("BIT 1,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 1,(HL)"));
+                    break;
                 /* BIT 1,A */
                 case 0x4f:
-	                sops = sops_add(sops, op_0_2("BIT 1,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 1,A"));
+                    break;
                 /* BIT 2,B */
                 case 0x50:
-	                sops = sops_add(sops, op_0_2("BIT 2,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 2,B"));
+                    break;
                 /* BIT 2,C */
                 case 0x51:
-	                sops = sops_add(sops, op_0_2("BIT 2,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 2,C"));
+                    break;
                 /* BIT 2,D */
                 case 0x52:
-	                sops = sops_add(sops, op_0_2("BIT 2,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 2,D"));
+                    break;
                 /* BIT 2,E */
                 case 0x53:
-	                sops = sops_add(sops, op_0_2("BIT 2,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 2,E"));
+                    break;
                 /* BIT 2,H */
                 case 0x54:
-	                sops = sops_add(sops, op_0_2("BIT 2,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 2,H"));
+                    break;
                 /* BIT 2,L */
                 case 0x55:
-	                sops = sops_add(sops, op_0_2("BIT 2,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 2,L"));
+                    break;
                 /* BIT 2,(HL) */
                 case 0x56:
-	                sops = sops_add(sops, op_0_2("BIT 2,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 2,(HL)"));
+                    break;
                 /* BIT 2,A */
                 case 0x57:
-	                sops = sops_add(sops, op_0_2("BIT 2,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 2,A"));
+                    break;
                 /* BIT 3,B */
                 case 0x58:
-	                sops = sops_add(sops, op_0_2("BIT 3,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 3,B"));
+                    break;
                 /* BIT 3,C */
                 case 0x59:
-	                sops = sops_add(sops, op_0_2("BIT 3,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 3,C"));
+                    break;
                 /* BIT 3,D */
                 case 0x5a:
-	                sops = sops_add(sops, op_0_2("BIT 3,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 3,D"));
+                    break;
                 /* BIT 3,E */
                 case 0x5b:
-	                sops = sops_add(sops, op_0_2("BIT 3,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 3,E"));
+                    break;
                 /* BIT 3,H */
                 case 0x5c:
-	                sops = sops_add(sops, op_0_2("BIT 3,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 3,H"));
+                    break;
                 /* BIT 3,L */
                 case 0x5d:
-	                sops = sops_add(sops, op_0_2("BIT 3,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 3,L"));
+                    break;
                 /* BIT 3,(HL) */
                 case 0x5e:
-	                sops = sops_add(sops, op_0_2("BIT 3,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 3,(HL)"));
+                    break;
                 /* BIT 3,A */
                 case 0x5f:
-	                sops = sops_add(sops, op_0_2("BIT 3,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 3,A"));
+                    break;
                 /* BIT 4,B */
                 case 0x60:
-	                sops = sops_add(sops, op_0_2("BIT 4,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 4,B"));
+                    break;
                 /* BIT 4,C */
                 case 0x61:
-	                sops = sops_add(sops, op_0_2("BIT 4,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 4,C"));
+                    break;
                 /* BIT 4,D */
                 case 0x62:
-	                sops = sops_add(sops, op_0_2("BIT 4,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 4,D"));
+                    break;
                 /* BIT 4,E */
                 case 0x63:
-	                sops = sops_add(sops, op_0_2("BIT 4,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 4,E"));
+                    break;
                 /* BIT 4,H */
                 case 0x64:
-	                sops = sops_add(sops, op_0_2("BIT 4,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 4,H"));
+                    break;
                 /* BIT 4,L */
                 case 0x65:
-	                sops = sops_add(sops, op_0_2("BIT 4,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 4,L"));
+                    break;
                 /* BIT 4,(HL) */
                 case 0x66:
-	                sops = sops_add(sops, op_0_2("BIT 4,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 4,(HL)"));
+                    break;
                 /* BIT 4,A */
                 case 0x67:
-	                sops = sops_add(sops, op_0_2("BIT 4,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 4,A"));
+                    break;
                 /* BIT 5,B */
                 case 0x68:
-	                sops = sops_add(sops, op_0_2("BIT 5,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 5,B"));
+                    break;
                 /* BIT 5,C */
                 case 0x69:
-	                sops = sops_add(sops, op_0_2("BIT 5,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 5,C"));
+                    break;
                 /* BIT 5,D */
                 case 0x6a:
-	                sops = sops_add(sops, op_0_2("BIT 5,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 5,D"));
+                    break;
                 /* BIT 5,E */
                 case 0x6b:
-	                sops = sops_add(sops, op_0_2("BIT 5,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 5,E"));
+                    break;
                 /* BIT 5,H */
                 case 0x6c:
-	                sops = sops_add(sops, op_0_2("BIT 5,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 5,H"));
+                    break;
                 /* BIT 5,L */
                 case 0x6d:
-	                sops = sops_add(sops, op_0_2("BIT 5,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 5,L"));
+                    break;
                 /* BIT 5,(HL) */
                 case 0x6e:
-	                sops = sops_add(sops, op_0_2("BIT 5,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 5,(HL)"));
+                    break;
                 /* BIT 5,A */
                 case 0x6f:
-	                sops = sops_add(sops, op_0_2("BIT 5,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 5,A"));
+                    break;
                 /* BIT 6,B */
                 case 0x70:
-	                sops = sops_add(sops, op_0_2("BIT 6,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 6,B"));
+                    break;
                 /* BIT 6,C */
                 case 0x71:
-	                sops = sops_add(sops, op_0_2("BIT 6,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 6,C"));
+                    break;
                 /* BIT 6,D */
                 case 0x72:
-	                sops = sops_add(sops, op_0_2("BIT 6,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 6,D"));
+                    break;
                 /* BIT 6,E */
                 case 0x73:
-	                sops = sops_add(sops, op_0_2("BIT 6,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 6,E"));
+                    break;
                 /* BIT 6,H */
                 case 0x74:
-	                sops = sops_add(sops, op_0_2("BIT 6,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 6,H"));
+                    break;
                 /* BIT 6,L */
                 case 0x75:
-	                sops = sops_add(sops, op_0_2("BIT 6,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 6,L"));
+                    break;
                 /* BIT 6,(HL) */
                 case 0x76:
-	                sops = sops_add(sops, op_0_2("BIT 6,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 6,(HL)"));
+                    break;
                 /* BIT 6,A */
                 case 0x77:
-	                sops = sops_add(sops, op_0_2("BIT 6,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 6,A"));
+                    break;
                 /* BIT 7,B */
                 case 0x78:
-	                sops = sops_add(sops, op_0_2("BIT 7,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 7,B"));
+                    break;
                 /* BIT 7,C */
                 case 0x79:
-	                sops = sops_add(sops, op_0_2("BIT 7,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 7,C"));
+                    break;
                 /* BIT 7,D */
                 case 0x7a:
-	                sops = sops_add(sops, op_0_2("BIT 7,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 7,D"));
+                    break;
                 /* BIT 7,E */
                 case 0x7b:
-	                sops = sops_add(sops, op_0_2("BIT 7,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 7,E"));
+                    break;
                 /* BIT 7,H */
                 case 0x7c:
-	                sops = sops_add(sops, op_0_2("BIT 7,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 7,H"));
+                    break;
                 /* BIT 7,L */
                 case 0x7d:
-	                sops = sops_add(sops, op_0_2("BIT 7,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 7,L"));
+                    break;
                 /* BIT 7,(HL) */
                 case 0x7e:
-	                sops = sops_add(sops, op_0_2("BIT 7,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 7,(HL)"));
+                    break;
                 /* BIT 7,A */
                 case 0x7f:
-	                sops = sops_add(sops, op_0_2("BIT 7,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("BIT 7,A"));
+                    break;
                 /* RES 0,B */
                 case 0x80:
-	                sops = sops_add(sops, op_0_2("RES 0,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 0,B"));
+                    break;
                 /* RES 0,C */
                 case 0x81:
-	                sops = sops_add(sops, op_0_2("RES 0,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 0,C"));
+                    break;
                 /* RES 0,D */
                 case 0x82:
-	                sops = sops_add(sops, op_0_2("RES 0,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 0,D"));
+                    break;
                 /* RES 0,E */
                 case 0x83:
-	                sops = sops_add(sops, op_0_2("RES 0,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 0,E"));
+                    break;
                 /* RES 0,H */
                 case 0x84:
-	                sops = sops_add(sops, op_0_2("RES 0,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 0,H"));
+                    break;
                 /* RES 0,L */
                 case 0x85:
-	                sops = sops_add(sops, op_0_2("RES 0,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 0,L"));
+                    break;
                 /* RES 0,(HL) */
                 case 0x86:
-	                sops = sops_add(sops, op_0_2("RES 0,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 0,(HL)"));
+                    break;
                 /* RES 0,A */
                 case 0x87:
-	                sops = sops_add(sops, op_0_2("RES 0,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 0,A"));
+                    break;
                 /* RES 1,B */
                 case 0x88:
-	                sops = sops_add(sops, op_0_2("RES 1,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 1,B"));
+                    break;
                 /* RES 1,C */
                 case 0x89:
-	                sops = sops_add(sops, op_0_2("RES 1,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 1,C"));
+                    break;
                 /* RES 1,D */
                 case 0x8a:
-	                sops = sops_add(sops, op_0_2("RES 1,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 1,D"));
+                    break;
                 /* RES 1,E */
                 case 0x8b:
-	                sops = sops_add(sops, op_0_2("RES 1,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 1,E"));
+                    break;
                 /* RES 1,H */
                 case 0x8c:
-	                sops = sops_add(sops, op_0_2("RES 1,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 1,H"));
+                    break;
                 /* RES 1,L */
                 case 0x8d:
-	                sops = sops_add(sops, op_0_2("RES 1,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 1,L"));
+                    break;
                 /* RES 1,(HL) */
                 case 0x8e:
-	                sops = sops_add(sops, op_0_2("RES 1,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 1,(HL)"));
+                    break;
                 /* RES 1,A */
                 case 0x8f:
-	                sops = sops_add(sops, op_0_2("RES 1,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 1,A"));
+                    break;
                 /* RES 2,B */
                 case 0x90:
-	                sops = sops_add(sops, op_0_2("RES 2,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 2,B"));
+                    break;
                 /* RES 2,C */
                 case 0x91:
-	                sops = sops_add(sops, op_0_2("RES 2,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 2,C"));
+                    break;
                 /* RES 2,D */
                 case 0x92:
-	                sops = sops_add(sops, op_0_2("RES 2,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 2,D"));
+                    break;
                 /* RES 2,E */
                 case 0x93:
-	                sops = sops_add(sops, op_0_2("RES 2,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 2,E"));
+                    break;
                 /* RES 2,H */
                 case 0x94:
-	                sops = sops_add(sops, op_0_2("RES 2,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 2,H"));
+                    break;
                 /* RES 2,L */
                 case 0x95:
-	                sops = sops_add(sops, op_0_2("RES 2,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 2,L"));
+                    break;
                 /* RES 2,(HL) */
                 case 0x96:
-	                sops = sops_add(sops, op_0_2("RES 2,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 2,(HL)"));
+                    break;
                 /* RES 2,A */
                 case 0x97:
-	                sops = sops_add(sops, op_0_2("RES 2,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 2,A"));
+                    break;
                 /* RES 3,B */
                 case 0x98:
-	                sops = sops_add(sops, op_0_2("RES 3,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 3,B"));
+                    break;
                 /* RES 3,C */
                 case 0x99:
-	                sops = sops_add(sops, op_0_2("RES 3,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 3,C"));
+                    break;
                 /* RES 3,D */
                 case 0x9a:
-	                sops = sops_add(sops, op_0_2("RES 3,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 3,D"));
+                    break;
                 /* RES 3,E */
                 case 0x9b:
-	                sops = sops_add(sops, op_0_2("RES 3,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 3,E"));
+                    break;
                 /* RES 3,H */
                 case 0x9c:
-	                sops = sops_add(sops, op_0_2("RES 3,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 3,H"));
+                    break;
                 /* RES 3,L */
                 case 0x9d:
-	                sops = sops_add(sops, op_0_2("RES 3,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 3,L"));
+                    break;
                 /* RES 3,(HL) */
                 case 0x9e:
-	                sops = sops_add(sops, op_0_2("RES 3,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 3,(HL)"));
+                    break;
                 /* RES 3,A */
                 case 0x9f:
-	                sops = sops_add(sops, op_0_2("RES 3,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 3,A"));
+                    break;
                 /* RES 4,B */
                 case 0xa0:
-	                sops = sops_add(sops, op_0_2("RES 4,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 4,B"));
+                    break;
                 /* RES 4,C */
                 case 0xa1:
-	                sops = sops_add(sops, op_0_2("RES 4,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 4,C"));
+                    break;
                 /* RES 4,D */
                 case 0xa2:
-	                sops = sops_add(sops, op_0_2("RES 4,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 4,D"));
+                    break;
                 /* RES 4,E */
                 case 0xa3:
-	                sops = sops_add(sops, op_0_2("RES 4,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 4,E"));
+                    break;
                 /* RES 4,H */
                 case 0xa4:
-	                sops = sops_add(sops, op_0_2("RES 4,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 4,H"));
+                    break;
                 /* RES 4,L */
                 case 0xa5:
-	                sops = sops_add(sops, op_0_2("RES 4,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 4,L"));
+                    break;
                 /* RES 4,(HL) */
                 case 0xa6:
-	                sops = sops_add(sops, op_0_2("RES 4,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 4,(HL)"));
+                    break;
                 /* RES 4,A */
                 case 0xa7:
-	                sops = sops_add(sops, op_0_2("RES 4,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 4,A"));
+                    break;
                 /* RES 5,B */
                 case 0xa8:
-	                sops = sops_add(sops, op_0_2("RES 5,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 5,B"));
+                    break;
                 /* RES 5,C */
                 case 0xa9:
-	                sops = sops_add(sops, op_0_2("RES 5,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 5,C"));
+                    break;
                 /* RES 5,D */
                 case 0xaa:
-	                sops = sops_add(sops, op_0_2("RES 5,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 5,D"));
+                    break;
                 /* RES 5,E */
                 case 0xab:
-	                sops = sops_add(sops, op_0_2("RES 5,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 5,E"));
+                    break;
                 /* RES 5,H */
                 case 0xac:
-	                sops = sops_add(sops, op_0_2("RES 5,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 5,H"));
+                    break;
                 /* RES 5,L */
                 case 0xad:
-	                sops = sops_add(sops, op_0_2("RES 5,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 5,L"));
+                    break;
                 /* RES 5,(HL) */
                 case 0xae:
-	                sops = sops_add(sops, op_0_2("RES 5,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 5,(HL)"));
+                    break;
                 /* RES 5,A */
                 case 0xaf:
-	                sops = sops_add(sops, op_0_2("RES 5,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 5,A"));
+                    break;
                 /* RES 6,B */
                 case 0xb0:
-	                sops = sops_add(sops, op_0_2("RES 6,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 6,B"));
+                    break;
                 /* RES 6,C */
                 case 0xb1:
-	                sops = sops_add(sops, op_0_2("RES 6,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 6,C"));
+                    break;
                 /* RES 6,D */
                 case 0xb2:
-	                sops = sops_add(sops, op_0_2("RES 6,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 6,D"));
+                    break;
                 /* RES 6,E */
                 case 0xb3:
-	                sops = sops_add(sops, op_0_2("RES 6,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 6,E"));
+                    break;
                 /* RES 6,H */
                 case 0xb4:
-	                sops = sops_add(sops, op_0_2("RES 6,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 6,H"));
+                    break;
                 /* RES 6,L */
                 case 0xb5:
-	                sops = sops_add(sops, op_0_2("RES 6,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 6,L"));
+                    break;
                 /* RES 6,(HL) */
                 case 0xb6:
-	                sops = sops_add(sops, op_0_2("RES 6,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 6,(HL)"));
+                    break;
                 /* RES 6,A */
                 case 0xb7:
-	                sops = sops_add(sops, op_0_2("RES 6,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 6,A"));
+                    break;
                 /* RES 7,B */
                 case 0xb8:
-	                sops = sops_add(sops, op_0_2("RES 7,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 7,B"));
+                    break;
                 /* RES 7,C */
                 case 0xb9:
-	                sops = sops_add(sops, op_0_2("RES 7,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 7,C"));
+                    break;
                 /* RES 7,D */
                 case 0xba:
-	                sops = sops_add(sops, op_0_2("RES 7,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 7,D"));
+                    break;
                 /* RES 7,E */
                 case 0xbb:
-	                sops = sops_add(sops, op_0_2("RES 7,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 7,E"));
+                    break;
                 /* RES 7,H */
                 case 0xbc:
-	                sops = sops_add(sops, op_0_2("RES 7,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 7,H"));
+                    break;
                 /* RES 7,L */
                 case 0xbd:
-	                sops = sops_add(sops, op_0_2("RES 7,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 7,L"));
+                    break;
                 /* RES 7,(HL) */
                 case 0xbe:
-	                sops = sops_add(sops, op_0_2("RES 7,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 7,(HL)"));
+                    break;
                 /* RES 7,A */
                 case 0xbf:
-	                sops = sops_add(sops, op_0_2("RES 7,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("RES 7,A"));
+                    break;
                 /* SET 0,B */
                 case 0xc0:
-	                sops = sops_add(sops, op_0_2("SET 0,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 0,B"));
+                    break;
                 /* SET 0,C */
                 case 0xc1:
-	                sops = sops_add(sops, op_0_2("SET 0,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 0,C"));
+                    break;
                 /* SET 0,D */
                 case 0xc2:
-	                sops = sops_add(sops, op_0_2("SET 0,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 0,D"));
+                    break;
                 /* SET 0,E */
                 case 0xc3:
-	                sops = sops_add(sops, op_0_2("SET 0,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 0,E"));
+                    break;
                 /* SET 0,H */
                 case 0xc4:
-	                sops = sops_add(sops, op_0_2("SET 0,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 0,H"));
+                    break;
                 /* SET 0,L */
                 case 0xc5:
-	                sops = sops_add(sops, op_0_2("SET 0,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 0,L"));
+                    break;
                 /* SET 0,(HL) */
                 case 0xc6:
-	                sops = sops_add(sops, op_0_2("SET 0,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 0,(HL)"));
+                    break;
                 /* SET 0,A */
                 case 0xc7:
-	                sops = sops_add(sops, op_0_2("SET 0,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 0,A"));
+                    break;
                 /* SET 1,B */
                 case 0xc8:
-	                sops = sops_add(sops, op_0_2("SET 1,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 1,B"));
+                    break;
                 /* SET 1,C */
                 case 0xc9:
-	                sops = sops_add(sops, op_0_2("SET 1,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 1,C"));
+                    break;
                 /* SET 1,D */
                 case 0xca:
-	                sops = sops_add(sops, op_0_2("SET 1,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 1,D"));
+                    break;
                 /* SET 1,E */
                 case 0xcb:
-	                sops = sops_add(sops, op_0_2("SET 1,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 1,E"));
+                    break;
                 /* SET 1,H */
                 case 0xcc:
-	                sops = sops_add(sops, op_0_2("SET 1,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 1,H"));
+                    break;
                 /* SET 1,L */
                 case 0xcd:
-	                sops = sops_add(sops, op_0_2("SET 1,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 1,L"));
+                    break;
                 /* SET 1,(HL) */
                 case 0xce:
-	                sops = sops_add(sops, op_0_2("SET 1,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 1,(HL)"));
+                    break;
                 /* SET 1,A */
                 case 0xcf:
-	                sops = sops_add(sops, op_0_2("SET 1,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 1,A"));
+                    break;
                 /* SET 2,B */
                 case 0xd0:
-	                sops = sops_add(sops, op_0_2("SET 2,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 2,B"));
+                    break;
                 /* SET 2,C */
                 case 0xd1:
-	                sops = sops_add(sops, op_0_2("SET 2,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 2,C"));
+                    break;
                 /* SET 2,D */
                 case 0xd2:
-	                sops = sops_add(sops, op_0_2("SET 2,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 2,D"));
+                    break;
                 /* SET 2,E */
                 case 0xd3:
-	                sops = sops_add(sops, op_0_2("SET 2,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 2,E"));
+                    break;
                 /* SET 2,H */
                 case 0xd4:
-	                sops = sops_add(sops, op_0_2("SET 2,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 2,H"));
+                    break;
                 /* SET 2,L */
                 case 0xd5:
-	                sops = sops_add(sops, op_0_2("SET 2,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 2,L"));
+                    break;
                 /* SET 2,(HL) */
                 case 0xd6:
-	                sops = sops_add(sops, op_0_2("SET 2,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 2,(HL)"));
+                    break;
                 /* SET 2,A */
                 case 0xd7:
-	                sops = sops_add(sops, op_0_2("SET 2,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 2,A"));
+                    break;
                 /* SET 3,B */
                 case 0xd8:
-	                sops = sops_add(sops, op_0_2("SET 3,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 3,B"));
+                    break;
                 /* SET 3,C */
                 case 0xd9:
-	                sops = sops_add(sops, op_0_2("SET 3,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 3,C"));
+                    break;
                 /* SET 3,D */
                 case 0xda:
-	                sops = sops_add(sops, op_0_2("SET 3,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 3,D"));
+                    break;
                 /* SET 3,E */
                 case 0xdb:
-	                sops = sops_add(sops, op_0_2("SET 3,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 3,E"));
+                    break;
                 /* SET 3,H */
                 case 0xdc:
-	                sops = sops_add(sops, op_0_2("SET 3,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 3,H"));
+                    break;
                 /* SET 3,L */
                 case 0xdd:
-	                sops = sops_add(sops, op_0_2("SET 3,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 3,L"));
+                    break;
                 /* SET 3,(HL) */
                 case 0xde:
-	                sops = sops_add(sops, op_0_2("SET 3,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 3,(HL)"));
+                    break;
                 /* SET 3,A */
                 case 0xdf:
-	                sops = sops_add(sops, op_0_2("SET 3,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 3,A"));
+                    break;
                 /* SET 4,B */
                 case 0xe0:
-	                sops = sops_add(sops, op_0_2("SET 4,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 4,B"));
+                    break;
                 /* SET 4,C */
                 case 0xe1:
-	                sops = sops_add(sops, op_0_2("SET 4,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 4,C"));
+                    break;
                 /* SET 4,D */
                 case 0xe2:
-	                sops = sops_add(sops, op_0_2("SET 4,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 4,D"));
+                    break;
                 /* SET 4,E */
                 case 0xe3:
-	                sops = sops_add(sops, op_0_2("SET 4,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 4,E"));
+                    break;
                 /* SET 4,H */
                 case 0xe4:
-	                sops = sops_add(sops, op_0_2("SET 4,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 4,H"));
+                    break;
                 /* SET 4,L */
                 case 0xe5:
-	                sops = sops_add(sops, op_0_2("SET 4,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 4,L"));
+                    break;
                 /* SET 4,(HL) */
                 case 0xe6:
-	                sops = sops_add(sops, op_0_2("SET 4,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 4,(HL)"));
+                    break;
                 /* SET 4,A */
                 case 0xe7:
-	                sops = sops_add(sops, op_0_2("SET 4,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 4,A"));
+                    break;
                 /* SET 5,B */
                 case 0xe8:
-	                sops = sops_add(sops, op_0_2("SET 5,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 5,B"));
+                    break;
                 /* SET 5,C */
                 case 0xe9:
-	                sops = sops_add(sops, op_0_2("SET 5,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 5,C"));
+                    break;
                 /* SET 5,D */
                 case 0xea:
-	                sops = sops_add(sops, op_0_2("SET 5,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 5,D"));
+                    break;
                 /* SET 5,E */
                 case 0xeb:
-	                sops = sops_add(sops, op_0_2("SET 5,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 5,E"));
+                    break;
                 /* SET 5,H */
                 case 0xec:
-	                sops = sops_add(sops, op_0_2("SET 5,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 5,H"));
+                    break;
                 /* SET 5,L */
                 case 0xed:
-	                sops = sops_add(sops, op_0_2("SET 5,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 5,L"));
+                    break;
                 /* SET 5,(HL) */
                 case 0xee:
-	                sops = sops_add(sops, op_0_2("SET 5,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 5,(HL)"));
+                    break;
                 /* SET 5,A */
                 case 0xef:
-	                sops = sops_add(sops, op_0_2("SET 5,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 5,A"));
+                    break;
                 /* SET 6,B */
                 case 0xf0:
-	                sops = sops_add(sops, op_0_2("SET 6,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 6,B"));
+                    break;
                 /* SET 6,C */
                 case 0xf1:
-	                sops = sops_add(sops, op_0_2("SET 6,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 6,C"));
+                    break;
                 /* SET 6,D */
                 case 0xf2:
-	                sops = sops_add(sops, op_0_2("SET 6,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 6,D"));
+                    break;
                 /* SET 6,E */
                 case 0xf3:
-	                sops = sops_add(sops, op_0_2("SET 6,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 6,E"));
+                    break;
                 /* SET 6,H */
                 case 0xf4:
-	                sops = sops_add(sops, op_0_2("SET 6,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 6,H"));
+                    break;
                 /* SET 6,L */
                 case 0xf5:
-	                sops = sops_add(sops, op_0_2("SET 6,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 6,L"));
+                    break;
                 /* SET 6,(HL) */
                 case 0xf6:
-	                sops = sops_add(sops, op_0_2("SET 6,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 6,(HL)"));
+                    break;
                 /* SET 6,A */
                 case 0xf7:
-	                sops = sops_add(sops, op_0_2("SET 6,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 6,A"));
+                    break;
                 /* SET 7,B */
                 case 0xf8:
-	                sops = sops_add(sops, op_0_2("SET 7,B"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 7,B"));
+                    break;
                 /* SET 7,C */
                 case 0xf9:
-	                sops = sops_add(sops, op_0_2("SET 7,C"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 7,C"));
+                    break;
                 /* SET 7,D */
                 case 0xfa:
-	                sops = sops_add(sops, op_0_2("SET 7,D"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 7,D"));
+                    break;
                 /* SET 7,E */
                 case 0xfb:
-	                sops = sops_add(sops, op_0_2("SET 7,E"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 7,E"));
+                    break;
                 /* SET 7,H */
                 case 0xfc:
-	                sops = sops_add(sops, op_0_2("SET 7,H"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 7,H"));
+                    break;
                 /* SET 7,L */
                 case 0xfd:
-	                sops = sops_add(sops, op_0_2("SET 7,L"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 7,L"));
+                    break;
                 /* SET 7,(HL) */
                 case 0xfe:
-	                sops = sops_add(sops, op_0_2("SET 7,(HL)"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 7,(HL)"));
+                    break;
                 /* SET 7,A */
                 case 0xff:
-	                sops = sops_add(sops, op_0_2("SET 7,A"));
-	                break;
+                    sops = sops_add(sops, op_0_2("SET 7,A"));
+                    break;
                 }
                 pc += 2;
                 break;
@@ -2482,8 +2482,8 @@ int main(int argc, char** argv) {
                 addr16 = r->raw[phy(pc+1)] | (r->raw[phy(pc+2)]<<8);
                 sops = sops_add(sops, op_lb("LD", addr16, ",A"));
                 if(addr16 == 0x2000 || addr16 == 0x2100) {
-	                printf("[0x%.8X] Bank switch to %d\n", phy(pc), bank);
-	                bank = a;
+                    printf("[0x%.8X] Bank switch to %d\n", phy(pc), bank);
+                    bank = a;
                 }
                 pc += 3;
                 break;
@@ -2570,17 +2570,17 @@ int main(int argc, char** argv) {
                 pc += 1;
                 break;
             /* AUTOGENERATED - end */
-			default:
-				printf("[0x%.8X] Unknown opcode (0x%.2X), stopping\n", phy(pc), r->raw[phy(pc)]);
-				goto finish;
-		}
-	}
+            default:
+                printf("[0x%.8X] Unknown opcode (0x%.2X), stopping\n", phy(pc), r->raw[phy(pc)]);
+                goto finish;
+        }
+    }
 
 finish:
-	print_dump();
+    print_dump();
 
-	rom_free(r);
-	state_free(top);
-	
-	return 0;
+    rom_free(r);
+    state_free(top);
+    
+    return 0;
 }
