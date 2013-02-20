@@ -3,10 +3,10 @@ gb-disasm
 
 GameBoy ROMs disassembler.
 
-Usage: gb-disasm.exe <ROM> -o <OUT_FILE> -a
-<ROM> -> obligatory, ROM file to be disassembled
-  -o  -> optional, disassembly output filename, default is console
-  -a  -> optional, print assembly, default is print binary dump
+<pre>Usage: gb-disasm.exe <ROM> -o <OUT_FILE> -a
+ROM -> obligatory, ROM file to be disassembled
+-o  -> optional, disassembly output filename, default is console
+-a  -> optional, print assembly, default is print binary dump</pre>
 
 It is not finished and could disassemble only parts of the ROMs binaries.
 Didn't test it really on ROMs with MBC (Memory Bank Controller). Disassembly 
@@ -17,5 +17,5 @@ uses opcodes table (opcodes.html) to generate parsing code in C.
 
 To compile it on linux in src directory execute: gcc main.c -O2 -o gb-disasm
 
-If you know why it's failing (I don't undestand GB working mechanism enought), 
-please contact me at maciek.muszkowski@gmail.com.
+<b>If you know why it's failing (I don't undestand GB working mechanism enought), 
+please contact me by mail.</b>
