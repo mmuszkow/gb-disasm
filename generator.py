@@ -72,23 +72,23 @@ for i in range(0, 0x100):
             bvar = '(' + var + ')'
             if op[0].endswith(var):
                 name = op[0][0:len(op[0])-len(var)-1]
-                print '\tsops = sops_add(sops, op_r("%s", addr8));' % name
+                print '\tsops = sops_add(sops, op_r8("%s", addr8));' % name
                 break
             elif op[0].endswith(bvar):
                 name = op[0][0:len(op[0])-len(bvar)-1]
-                print '\tsops = sops_add(sops, op_rb("%s", addr8));' % name
+                print '\tsops = sops_add(sops, op_rb8("%s", addr8));' % name
                 break
             elif bvar in op[0]:
                 where = op[0].find(bvar)
                 name = op[0][0:where].strip()
                 r = op[0][where+len(bvar):].strip()
-                print '\tsops = sops_add(sops, op_lb("%s", addr8, "%s"));' % (name, r)
+                print '\tsops = sops_add(sops, op_lb8("%s", addr8, "%s"));' % (name, r)
                 break
             elif var in op[0]:
                 where = op[0].find(var)
                 name = op[0][0:where].strip()
                 r = op[0][where+len(var):].strip()
-                print '\tsops = sops_add(sops, op_l("%s", addr8, "%s"));' % (name, r)
+                print '\tsops = sops_add(sops, op_l8("%s", addr8, "%s"));' % (name, r)
                 break
     elif(op[1] == '3'): # 3-byte ops
         print '\taddr16 = r->raw[phy(pc+1)] | (r->raw[phy(pc+2)]<<8);'
@@ -96,43 +96,41 @@ for i in range(0, 0x100):
             bvar = '(' + var + ')'
             if op[0].endswith(var):
                 name = op[0][0:len(op[0])-len(var)-1]
-                print '\tsops = sops_add(sops, op_r("%s", addr16));' % name
+                print '\tsops = sops_add(sops, op_r16("%s", addr16));' % name
                 break
             elif op[0].endswith(bvar):
                 name = op[0][0:len(op[0])-len(bvar)-1]
-                print '\tsops = sops_add(sops, op_rb("%s", addr16));' % name
+                print '\tsops = sops_add(sops, op_rb16("%s", addr16));' % name
                 break
             elif bvar in op[0]:
                 where = op[0].find(bvar)
                 name = op[0][0:where].strip()
                 r = op[0][where+len(bvar):].strip()
-                print '\tsops = sops_add(sops, op_lb("%s", addr16, "%s"));' % (name, r)
+                print '\tsops = sops_add(sops, op_lb16("%s", addr16, "%s"));' % (name, r)
                 break
             elif var in op[0]:
                 where = op[0].find(var)
                 name = op[0][0:where].strip()
                 r = op[0][where+len(var):].strip()
-                print '\tsops = sops_add(sops, op_l("%s", addr16, "%s"));' % (name, r)
+                print '\tsops = sops_add(sops, op_l16("%s", addr16, "%s"));' % (name, r)
                 break
     else:
         raise Exception('Wrong operator length')
         
     name = name.strip()
     if name.startswith('CALL'): # conditional jumps/calls
-        print '\tcall_addr.push_back(phy(addr16));'
-        print '\tjmp(addr16);'
+        print '\taddr_buff_add(&call_addr, phy(addr16));'
+        print '\tjmp16(addr16);'
     elif name.startswith('JP '):
-        print '\tjmp_addr.push_back(phy(addr16));'
-        print '\tjmp(addr16);'
+        print '\taddr_buff_add(&jmp_addr, phy(addr16));'
+        print '\tjmp16(addr16);'
     elif name.startswith('JR '):
-        print '\tjmp_addr.push_back(phy(pc + ((char)addr8)));'
-        print '\tjmp(addr8);'
+        print '\taddr_buff_add(&jmp_addr, phy(jmp8(addr8)));'
     elif name.startswith('JP'): # unconditional jumps
-        print '\tjmp_addr.push_back(phy(addr16));'
-        print '\tjmpu(addr16);'
+        print '\taddr_buff_add(&jmp_addr, phy(addr16));'
+        print '\tjmpu16(addr16);'
     elif name.startswith('JR'):
-        print '\tjmp_addr.push_back(phy(pc + ((char)addr8)));'
-        print '\tjmpu(addr8);';
+        print '\taddr_buff_add(&jmp_addr, phy(jmpu8(addr8));'
     elif name.startswith('RET '): # conditional ret
         print '\tpc += 1;'
     elif name.startswith('RET'): # unconditional ret

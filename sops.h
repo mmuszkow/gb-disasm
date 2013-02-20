@@ -7,6 +7,8 @@
 #define OP_FLAG_JMP_ADDR    0x01
 /** This operation is destination of a call instruction. */
 #define OP_FLAG_CALL_ADDR   0x02
+/** Jump/call instruction. */
+#define OP_FLAG_IS_JUMP     0x04
 
 /** Operation. */
 typedef struct op {
@@ -20,16 +22,19 @@ typedef struct op {
     uint8_t     len;
     /** Flags, used for labelling. */
     uint8_t     flags;
+    /** If jump or call, physical destination address. */
+    uint32_t    addr;
     /** Linked list. */
     struct op*  next;
 } op;
 
 op* op_create(uint32_t off, const uint8_t* code, uint8_t len, const char* name) {
     op* oper;
+    int i;
 
     oper = (op*)malloc(sizeof(op));
     oper->off = off;
-    for(int i=0; i<len; i++) 
+    for(i=0; i<len; i++) 
         oper->code[i] = code[i];
     oper->len = len;
     strcpy(oper->name, name);
@@ -105,6 +110,19 @@ void sops_set_flag(op* head, uint32_t addr, uint8_t flag) {
     }
 }
 
+/** Use this after call or jump instruction. */
+void sops_set_jmp(op* head, uint32_t addr, uint32_t daddr) {
+    op* tmp = head;
+    while(tmp) {
+        if(tmp->off == addr) {
+            tmp->flags |= OP_FLAG_IS_JUMP;
+            tmp->addr = daddr;
+            return;
+        }
+        tmp = tmp->next;
+    }
+}
+
 /** Hex dump. */
 void sops_dump(op* head, FILE* f) {
     op* tmp = head;
@@ -115,11 +133,16 @@ void sops_dump(op* head, FILE* f) {
                     tmp->off, tmp->code[0], tmp->name);
                 break;
             case 2:
-                fprintf(f, "[0x%.8X] 0x%.2X 0x%.2X      %s\n", 
-                    tmp->off, tmp->code[0], tmp->code[1], tmp->name);
+                if(strstr(tmp->name, "JR")) {
+                    fprintf(f, "[0x%.8X] 0x%.2X 0x%.2X      %s ; 0x%X\n", 
+                        tmp->off, tmp->code[0], tmp->code[1], tmp->name, tmp->addr);
+                } else {
+                    fprintf(f, "[0x%.8X] 0x%.2X 0x%.2X      %s\n", 
+                        tmp->off, tmp->code[0], tmp->code[1], tmp->name);
+                }
                 break;
             case 3:
-                fprintf(f, "[0x%.8X] 0x%.2X 0x%.2X 0x%.2X %s\n", 
+                fprintf(f, "[0x%.8X] 0x%.2X 0x%.2X 0x%.2X\n", 
                     tmp->off, tmp->code[0], tmp->code[1], tmp->code[2], tmp->name);
                 break;
         }
@@ -145,8 +168,18 @@ void sops_asm(op* head, FILE* f) {
             fprintf(f, "jmp_%x:\n", tmp->off);
         if(tmp->flags & OP_FLAG_CALL_ADDR)
             fprintf(f, "call_%x:\n", tmp->off);
-        fprintf(f, "\t%s\n", tmp->name);
+
+        if(tmp->flags & OP_FLAG_IS_JUMP) {
+            if(strstr(tmp->name, "CALL"))
+                fprintf(f, "\t%s ; sub_%x\n", tmp->name, tmp->addr);
+            else
+                fprintf(f, "\t%s ; jmp_%x\n", tmp->name, tmp->addr);
+        } else {
+            fprintf(f, "\t%s\n", tmp->name);
+        }
+
         if(strcmp(tmp->name, "RET") == 0) fprintf(f, "\n");
+        
         prev = tmp->off + tmp->len;
         tmp = tmp->next;
     }

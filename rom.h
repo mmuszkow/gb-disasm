@@ -6,10 +6,10 @@
 #include "stdinc.h"
 #include "header.h"
 
-struct rom {
+typedef struct rom {
     uint8_t*    raw;
     uint32_t    total;
-};
+} rom;
 
 rom* rom_load(const char* filename) {
     rom*        r;

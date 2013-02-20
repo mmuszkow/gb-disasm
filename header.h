@@ -85,7 +85,7 @@ const char* RAMS[MAX_RAMS] = {
 /** Cartridge header. */
 typedef struct {
     /* Chuj go wie. */
-    uint8_t    hgw[0x100];
+    uint8_t hgw[0x100];
     /** Entry point. */
     uint8_t jmp[0x4];
     /** Nintendo logo. */
@@ -95,7 +95,7 @@ typedef struct {
     /** Manufacturer code. */
     uint8_t manufacturer[0x4];
     /** CGB Flag. */
-    uint8_t    cgb;
+    uint8_t cgb;
     /** New Licensee Code. */
     uint8_t nlc[2];
     /** SGB Flag. */
