@@ -28,7 +28,12 @@ rom* rom_load(const char* filename) {
             r->raw = (uint8_t*)malloc(total);
             r->total = total;
             fseek(f, 0, SEEK_SET);
-            fread(r->raw, 1, total, f);
+            if(fread(r->raw, 1, total, f) != total) {
+                free(r->raw);
+                free(r);
+                fclose(f);
+                return NULL;
+            }
         }
         fclose(f);
     }
@@ -38,6 +43,7 @@ rom* rom_load(const char* filename) {
 
 void rom_free(rom* r) {
     if(r->raw) free(r->raw);
+    free(r);
 }
 
 cart_header* rom_header(rom* r) {

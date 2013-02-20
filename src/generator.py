@@ -131,7 +131,9 @@ for i in range(0, 0x100):
     
     # jumps/call handling
     name = name.strip()
-    if name.startswith('CALL'): # conditional jumps/calls
+    if i == 0xe9: # skip JP (HL)
+        print '\tpc += ' + op[1] + ';'
+    elif name.startswith('CALL'): # conditional jumps/calls
         print '\taddr_buff_add(&call_addr, phy(addr16));'
         print '\tjmp16(addr16);'
     elif name.startswith('JP '):
@@ -143,7 +145,7 @@ for i in range(0, 0x100):
         print '\taddr_buff_add(&jmp_addr, phy(addr16));'
         print '\tjmpu16(addr16);'
     elif name.startswith('JR'):
-        print '\taddr_buff_add(&jmp_addr, phy(jmpu8(addr8));'
+        print '\taddr_buff_add(&jmp_addr, phy(jmpu8(addr8)));'
     elif name.startswith('RET '): # conditional ret
         print '\tpc += 1;'
     elif name.startswith('RET'): # unconditional ret
