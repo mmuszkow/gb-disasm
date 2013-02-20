@@ -187,7 +187,7 @@ op* op_lb8(const char* opname, uint8_t addr, const char* right) {
     return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
-void print_dump_f(FILE* f) {
+void print_dump(FILE* f) {
     int i;
     for(i=0; i<jmp_addr.len; i++) {
         sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
@@ -198,20 +198,8 @@ void print_dump_f(FILE* f) {
     sops_dump(sops, f);        
 }
 
-void print_dump_fn(const char* file_name) {
-    FILE* f = fopen(file_name, "w");
-    if(f) {
-        print_dump_f(f);
-        fclose(f);
-    }
-}
-
-void print_dump(void) {
-    print_dump_f(stdout);
-}
-
 /* TODO: printing asm code is definetely not finished */
-void print_asm_f(FILE* f) {
+void print_asm(FILE* f) {
     int i;
     for(i=0; i<jmp_addr.len; i++) {
         sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
@@ -222,16 +210,13 @@ void print_asm_f(FILE* f) {
     sops_asm(sops, f);    
 }
 
-void print_asm_fn(const char* file_name) {
-    FILE* f = fopen(file_name, "w");
-    if(f) {
-        print_asm_f(f);
-        fclose(f);
-    }
-}
-
-void print_asm(void) {
-    print_asm_f(stdout);
+void usage(const char* argv0) {
+    printf(
+        "Usage: %s <ROM> -o <OUT_FILE> -a\n"
+        "<ROM> -> obligatory, ROM file to be disassembled\n"
+        "  -o  -> optional, disassembly output filename, default is console\n"
+        "  -a  -> optional, print assembly, default is print binary dump\n", 
+        argv0);
 }
 
 /* Remember the times when you put everything in main? They are coming back! */
@@ -239,37 +224,59 @@ int main(int argc, char** argv) {
     uint8_t     addr8;
     uint16_t    addr16;
 
-    argc = 2;
-    argv[1] = "tetris.gb";
+    /* Output params. */
+    int         asm = 0;
+    FILE*       out = stdout;
 
-    if(argc != 2) {
-        printf("Usage: %s <ROM>\n", argv[0]);
+    if(argc < 2 || argc > 5) {
+        usage(argv[0]);
         return -1;
     }
     
-    r = rom_load(argv[1]);
-    if(!r) {
-        puts("Could not load file");
-        return -2;
+    /* Parameters parsing. */
+    if(argc > 2) {
+        int arg = 2;
+        while(arg < argc) {
+            if(strcmp(argv[arg], "-a") == 0) {
+                asm = 1;
+                arg++;
+            } else if (strcmp(argv[arg], "-o") == 0) {
+                if(arg+1 < argc) {
+                    out = fopen(argv[arg+1], "w");
+                    if(!out) {
+                        printf("Could not open output file %s\n", argv[arg+1]);
+                        return -5;
+                    }
+                    arg += 2;
+                } else {
+                    usage(argv[0]);
+                    return -4;
+                }
+            } else {
+                usage(argv[0]);
+                return -3;
+            }            
+        }
     }
 
+    /* Load ROM. */
+    r = rom_load(argv[1]);
+    if(!r) {
+        printf("Could not load ROM file %s\n", argv[1]);
+        return -2;
+    }
     rom_info(r);
     
+    /* Init globals. */
     sops = NULL;
     top = NULL;
     addr_buff_init(&call_addr);
     addr_buff_init(&jmp_addr);
+    pc = 0x100; /* Start address is always 0x100 */
+    bank = 1; /* Bank 0 (default) == Bank 1 */
 
-    /* Start address is always 0x100 */
-    pc = 0x100;
-    /* Bank 0 (default) == Bank 1 */
-    bank = 1;
-
+    /* Disassembling loop. */
     while(1) {
-        printf("0x%X\n", phy(pc));
-        if(pc == 0x298) {
-            int a = 2;
-        }
         /* Do not visit same instruction twice */
         if(sops_contains(sops, phy(pc))) {
             /* Check if we have any other possible branches to follow */
@@ -2595,8 +2602,11 @@ case 0xff:
     }
 
 finish:
-    print_dump_fn("out.asm");
+    puts("");
+    if(asm) print_asm(out); else print_dump(out);
 
+    /* Free reources. */
+    if(out != stdout) fclose(out);
     rom_free(r);
     state_free(top);
     addr_buff_free(&call_addr);
