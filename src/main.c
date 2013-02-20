@@ -274,6 +274,13 @@ int main(int argc, char** argv) {
     addr_buff_init(&jmp_addr);
     pc = 0x100; /* Start address is always 0x100 */
     bank = 1; /* Bank 0 (default) == Bank 1 */
+    switch(rom_header(r)->type) {
+        case 0x00: /* ROM ONLY */
+        case 0x08: /* ROM+RAM */
+        case 0x09: /* ROM+RAM+BATTERY */
+            mbc = ROM_ONLY; break;
+        default: mbc = MBC1; /* TODO */
+    }
 
     /* Disassembling loop. */
     while(1) {
