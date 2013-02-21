@@ -3,7 +3,7 @@ gb-disasm
 
 GameBoy ROMs disassembler.
 
-<pre>Usage: gb-disasm.exe <ROM> -o <OUT_FILE> -a
+<pre>Usage: gb-disasm.exe &lt;ROM&gt; -o &lt;OUT_FILE&gt; -a
 ROM -> obligatory, ROM file to be disassembled
 -o  -> optional, disassembly output filename, default is console
 -a  -> optional, print assembly, default is print binary dump</pre>
