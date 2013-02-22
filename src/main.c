@@ -255,11 +255,17 @@ int main(int argc, char** argv) {
                 arg++;
             } else if (strcmp(argv[arg], "-s") == 0) {
                 if(arg+1 < argc) {
+                    uint32_t saddr;
                     if(strstr(argv[arg+1], "0x")) {
                         puts("Don't preceed start address with \"0x\"");
                         return -5;
                     }
-                    sscanf(argv[arg+1], "%X", &start);
+                    sscanf(argv[arg+1], "%X", &saddr);
+                    if(saddr >= 0x8000) {
+                        puts("Start address must be in range 0x0000-0x7FFF");
+                        return -6;
+                    }
+                    start = (uint16_t) saddr;
                     arg += 2;
                 } else {
                     puts("Specify the start address");
