@@ -135,17 +135,19 @@ for i in range(0, 0x100):
         print '\tpc += ' + op[1] + ';'
     elif name.startswith('CALL'): # conditional jumps/calls
         print '\taddr_buff_add(&call_addr, phy(addr16));'
-        print '\tjmp16(addr16);'
+        print '\tif(call_follow) jmp16(addr16); else pc += ' + op[1] +';'
     elif name.startswith('JP '):
         print '\taddr_buff_add(&jmp_addr, phy(addr16));'
-        print '\tjmp16(addr16);'
+        print '\tif(jmp_follow) jmp16(addr16); else pc += ' + op[1] +';'
     elif name.startswith('JR '):
-        print '\taddr_buff_add(&jmp_addr, phy(jmp8(addr8)));'
+        print '\taddr_buff_add(&jmp_addr, phy(rel_addr(addr8)));'
+        print '\tif(jmp_follow) jmp8(addr8); else pc += ' + op[1] +';'
     elif name.startswith('JP'): # unconditional jumps
         print '\taddr_buff_add(&jmp_addr, phy(addr16));'
-        print '\tjmpu16(addr16);'
+        print '\tif(jmp_follow) jmpu16(addr16); else pc = start;'
     elif name.startswith('JR'):
-        print '\taddr_buff_add(&jmp_addr, phy(jmpu8(addr8)));'
+        print '\taddr_buff_add(&jmp_addr, phy(rel_addr(addr8)));'
+        print '\tif(jmp_follow) jmpu8(addr8); else pc = start;'
     elif name.startswith('RET '): # conditional ret
         print '\tpc += 1;'
     elif name.startswith('RET'): # unconditional ret
