@@ -214,12 +214,12 @@ void usage(const char* argv0) {
     printf(
         "Usage: %s <ROM> -s <HEX> -b <BANK> -a -nc -nj\n"
         "<ROM> -> obligatory, ROM file to be disassembled\n"
-        "  -s  -> optional, start address (PC), default is 0x%X\n"
-        "  -b  -> optional, memory bank number, default is %d\n"
+        "  -s  -> optional, start address (PC), default is 0x100\n"
+        "  -b  -> optional, memory bank number, default is 1\n"
         "  -a  -> optional, print assembly, default is print binary dump\n"
         "  -nc -> optional, don't follow call instructions, default is to follow\n"
         "  -nj -> optional, don't follow jump instructions, default is to follow\n", 
-        argv0, start, bank);
+        argv0);
 }
 
 /* Remember the times when you put everything in main? They are coming back! */
