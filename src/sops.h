@@ -142,7 +142,7 @@ void sops_dump(op* head, FILE* f) {
                 }
                 break;
             case 3:
-                fprintf(f, "[0x%.8X] 0x%.2X 0x%.2X 0x%.2X\n", 
+                fprintf(f, "[0x%.8X] 0x%.2X 0x%.2X 0x%.2X %s\n", 
                     tmp->off, tmp->code[0], tmp->code[1], tmp->code[2], tmp->name);
                 break;
         }
@@ -151,14 +151,14 @@ void sops_dump(op* head, FILE* f) {
     }
 }
 
-/** Disassembled code. TODO: tbd */
+/** Disassembled code. */
 void sops_asm(op* head, FILE* f) {
     op* tmp = head;
     uint32_t prev = 0;
 
     while(tmp) {
         if(tmp->off != prev) {
-            // TODO
+            /* TODO: db 0x12, 0x34, ... */
             fprintf(f, "\t; %d data bytes\n", tmp->off - prev);
         }
         if(prev > tmp->off) {
