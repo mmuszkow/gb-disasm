@@ -133,6 +133,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				OutputFile="..\bin\$(ProjectName).exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				SubSystem="1"
@@ -172,7 +173,7 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\main.c"
+				RelativePath="..\src\main.c"
 				>
 			</File>
 		</Filter>
@@ -182,27 +183,31 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\addr_buff.h"
+				RelativePath="..\src\addr_buff.h"
 				>
 			</File>
 			<File
-				RelativePath=".\header.h"
+				RelativePath="..\src\generated.h"
 				>
 			</File>
 			<File
-				RelativePath=".\rom.h"
+				RelativePath="..\src\header.h"
 				>
 			</File>
 			<File
-				RelativePath=".\sops.h"
+				RelativePath="..\src\rom.h"
 				>
 			</File>
 			<File
-				RelativePath=".\state.h"
+				RelativePath="..\src\sops.h"
 				>
 			</File>
 			<File
-				RelativePath=".\stdinc.h"
+				RelativePath="..\src\state.h"
+				>
+			</File>
+			<File
+				RelativePath="..\src\stdinc.h"
 				>
 			</File>
 		</Filter>
