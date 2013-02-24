@@ -131,9 +131,12 @@ uint16_t jmpu8(uint8_t addr) {
 
 /** Return from call or jump. */
 void ret(void) {
-    pc = top->pc;        
-    bank = top->bank;
-    top = state_pop(top);
+    if(top) {
+        pc = top->pc;        
+        bank = top->bank;
+        top = state_pop(top);
+    } else
+        pc = start;
 }
 
 /** No-arg operator */
