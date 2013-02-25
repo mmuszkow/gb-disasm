@@ -44,7 +44,7 @@ VARS = ['d8', 'd16', 'a8', 'a16', 'r8']
 # additional operations for specified functions, bank change emulation
 spec = {
     0x3e: '\ta = addr8;',
-    0xea: '\tif(addr16 == 0x2000 || addr16 == 0x2100) {\n'
+    0xea: '\tif(mbc != ROM_ONLY && (addr16 == 0x2000 || addr16 == 0x2100)) {\n'
         + '\t\tprintf("[0x%.8X] Bank switch to %d\\n", phy(pc), bank);\n'
         + '\t\tbank = a;\n\t}', 
     0xe0: '\thmem[addr8] = a;', 

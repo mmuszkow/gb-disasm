@@ -70,7 +70,7 @@ uint16_t rel_addr(uint8_t addr) {
     if(addr & 0x80)
         return pc + (char)addr + 2;
     else
-        return pc + (addr & 0x7F);
+        return pc + (addr & 0x7F) + 2;
 }
 
 /** Conditional jump #1. */
@@ -333,8 +333,9 @@ int main(int argc, char** argv) {
         switch(r->raw[phy(pc)]) {
 #include "generated.h"
             default:
-                printf("[0x%.8X] Unknown opcode (0x%.2X), stopping\n", phy(pc), r->raw[phy(pc)]);
-                goto finish;
+                printf("Warning: Unknown opcode (0x%.2X) at 0x%.8X\n", r->raw[phy(pc)], phy(pc));
+                sops = sops_add(sops, op_0("-"));
+                pc = start;
         }
     }
 

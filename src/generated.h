@@ -2225,7 +2225,7 @@ case 0xe9:
 case 0xea:
 	addr16 = r->raw[phy(pc+1)] | (r->raw[phy(pc+2)]<<8);
 	sops = sops_add(sops, op_lb16("LD", addr16, ",A"));
-	if(addr16 == 0x2000 || addr16 == 0x2100) {
+	if(mbc != ROM_ONLY && (addr16 == 0x2000 || addr16 == 0x2100)) {
 		printf("[0x%.8X] Bank switch to %d\n", phy(pc), bank);
 		bank = a;
 	}
