@@ -80,7 +80,7 @@ void jmp16(uint16_t addr) {
         top = state_push(top, pc + 3, bank);
         pc = addr;
     } else {
-        printf("[0x.%8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
+        printf("[0x%.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
             phy(pc), addr, phy(addr));
         pc += 3;
     }
@@ -95,7 +95,7 @@ uint16_t jmp8(uint8_t addr) {
         pc = new_pc;
         return new_pc;
     } else {
-        printf("[0x.%8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
+        printf("[0x%.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
             phy(pc), new_pc, phy(new_pc));
         pc += 2;
         return start;
@@ -108,7 +108,7 @@ void jmpu16(uint16_t addr) {
         sops_set_jmp(sops, phy(pc), phy(addr));
         pc = addr;
     } else {
-        printf("[0x.%8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
+        printf("[0x%.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
             pc, addr, phy(addr));
         pc = start;
     }
@@ -122,7 +122,7 @@ uint16_t jmpu8(uint8_t addr) {
         pc = new_pc;
         return new_pc;
     } else {
-        printf("[0x.%8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
+        printf("[0x%.8X] Warning: Address too high, ignoring 0x%.4X (0x%.8X)\n", 
             pc, new_pc, phy(new_pc));
         pc = start;
         return start;
