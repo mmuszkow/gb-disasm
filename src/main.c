@@ -202,7 +202,7 @@ void print_dump(FILE* f) {
 }
 
 /* TODO: printing asm code is definetely not finished */
-void print_asm(FILE* f) {
+void print_asm(FILE* f, const char* rom) {
     int i;
     for(i=0; i<jmp_addr.len; i++) {
         sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
@@ -210,7 +210,7 @@ void print_asm(FILE* f) {
     for(i=0; i<call_addr.len; i++) {
         sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
     }
-    sops_asm(sops, f);    
+    sops_asm(sops, f, rom);    
 }
 
 void usage(const char* argv0) {
@@ -341,7 +341,7 @@ int main(int argc, char** argv) {
 
 finish:
     puts("");
-    if(assembly) print_asm(stdout); else print_dump(stdout);
+    if(assembly) print_asm(stdout, argv[1]); else print_dump(stdout);
 
     /* Free reources. */
     rom_free(r);

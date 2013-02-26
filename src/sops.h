@@ -152,17 +152,16 @@ void sops_dump(op* head, FILE* f) {
 }
 
 /** Disassembled code. */
-void sops_asm(op* head, FILE* f) {
+void sops_asm(op* head, FILE* f, const char* rom) {
     op* tmp = head;
     uint32_t prev = 0;
 
     while(tmp) {
         if(tmp->off != prev) {
-            /* TODO: db 0x12, 0x34, ... */
-            fprintf(f, "\t; %d data bytes\n", tmp->off - prev);
-        }
-        if(prev > tmp->off) {
-            fprintf(f, "\t; Something is wrong here\n");
+            if(prev > tmp->off)
+                fprintf(f, "\t; Something is wrong here\n");
+            else
+                fprintf(f, "\n\tINCBIN \"%s\",$%x,$%x\n", rom, prev, tmp->off);
         }
         if(tmp->flags & OP_FLAG_JMP_ADDR) 
             fprintf(f, "jmp_%x:\n", tmp->off);
