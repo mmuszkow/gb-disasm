@@ -190,29 +190,6 @@ op* op_lb8(const char* opname, uint8_t addr, const char* right) {
     return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
-void print_dump(FILE* f) {
-    int i;
-    for(i=0; i<jmp_addr.len; i++) {
-        sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
-    }
-    for(i=0; i<call_addr.len; i++) {
-        sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_CALL_ADDR);
-    }
-    sops_dump(sops, f);        
-}
-
-/* TODO: printing asm code is definetely not finished */
-void print_asm(FILE* f, const char* rom) {
-    int i;
-    for(i=0; i<jmp_addr.len; i++) {
-        sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
-    }
-    for(i=0; i<call_addr.len; i++) {
-        sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_CALL_ADDR);
-    }
-    sops_asm(sops, f, rom);    
-}
-
 void usage(const char* argv0) {
     printf(
         "Usage: %s <ROM> -s <HEX> -b <BANK> -a -nc -nj\n"
@@ -229,6 +206,7 @@ void usage(const char* argv0) {
 int main(int argc, char** argv) {
     uint8_t     addr8;
     uint16_t    addr16;
+    int         i;
 
     /* Params. */
     int         assembly = 0;
@@ -339,8 +317,17 @@ int main(int argc, char** argv) {
     }
 
 finish:
-    puts("");
-    if(assembly) print_asm(stdout, argv[1]); else print_dump(stdout);
+    /* create labels for followed jumps and calls */
+    for(i=0; i<jmp_addr.len; i++)
+        sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
+    for(i=0; i<call_addr.len; i++)
+        sops_set_flag(sops, call_addr.addr[i], OP_FLAG_CALL_ADDR);
+    
+    /* print results */
+    if(assembly) 
+        sops_asm(sops, stdout, argv[1]); 
+    else 
+        sops_dump(sops, stdout);
 
     /* Free reources. */
     rom_free(r);
