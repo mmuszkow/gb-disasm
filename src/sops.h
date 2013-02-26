@@ -153,26 +153,50 @@ void sops_dump(op* head, FILE* f) {
 
 /** Disassembled code. */
 void sops_asm(op* head, FILE* f, const char* rom) {
+    char buff[16];
     op* tmp = head;
     uint32_t prev = 0;
 
+    fprintf(f, "\tSECTION \"ROM0\", HOME[0]\n");
+    
     while(tmp) {
+        /* print data */
         if(tmp->off != prev) {
             if(prev > tmp->off)
                 fprintf(f, "\t; Something is wrong here\n");
             else
-                fprintf(f, "\n\tINCBIN \"%s\",$%x,$%x\n", rom, prev, tmp->off);
+                fprintf(f, "\n\tINCBIN \"%s\",$%x,$%x-$%x\n", rom, prev, tmp->off, prev);
         }
+        
+        /* print jump or call label */
         if(tmp->flags & OP_FLAG_JMP_ADDR) 
             fprintf(f, "jmp_%x:\n", tmp->off);
         if(tmp->flags & OP_FLAG_CALL_ADDR)
-            fprintf(f, "call_%x:\n", tmp->off);
+            fprintf(f, "sub_%x:\n", tmp->off);
 
+        /* print jump or call instruction */
         if(tmp->flags & OP_FLAG_IS_JUMP) {
             if(strstr(tmp->name, "CALL"))
-                fprintf(f, "\t%s ; sub_%x\n", tmp->name, tmp->addr);
-            else
-                fprintf(f, "\t%s ; jmp_%x\n", tmp->name, tmp->addr);
+                fprintf(f, "\tCALL sub_%x\n", tmp->addr);
+            else {
+                char* sep = strstr(tmp->name, ",");
+                if(sep) {
+                    strcpy(buff, tmp->name);
+                    buff[sep-tmp->name] = 0;
+                    if(strstr(buff, " ")) /* conditional jump */
+                        fprintf(f, "\t%s,jmp_%x\n", buff, tmp->addr);
+                    else
+                        fprintf(f, "\t%s jmp_%x\n", buff, tmp->addr);
+                } else {
+                    sep = strstr(tmp->name, " ");
+                    if(sep) {
+                        strcpy(buff, tmp->name);
+                        buff[sep-tmp->name] = 0;
+                        fprintf(f, "\t%s jmp_%x\n", buff, tmp->addr);
+                    } else
+                        fprintf(f, "\t%s ; Something went wrong\n", tmp->name);
+                }
+            }
         } else {
             fprintf(f, "\t%s\n", tmp->name);
         }

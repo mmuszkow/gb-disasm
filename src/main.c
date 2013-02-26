@@ -150,43 +150,43 @@ op* op_0_2(const char* opname) {
 
 /* Adresses as right arg */
 op* op_r16(const char* opname, uint16_t addr) {
-    sprintf(tmp, "%s,$%.4X", opname, addr);
+    sprintf(tmp, "%s$%.4X", opname, addr);
     return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
 }
 
 op* op_rb16(const char* opname, uint16_t addr) {
-    sprintf(tmp, "%s,($%.4X)", opname, addr);
+    sprintf(tmp, "%s[$%.4X]", opname, addr);
     return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
 }
 
 op* op_r8(const char* opname, uint8_t addr) {
-    sprintf(tmp, "%s,$%.2X", opname, addr);
+    sprintf(tmp, "%s$%.2X", opname, addr);
     return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
 op* op_rb8(const char* opname, uint8_t addr) {
-    sprintf(tmp, "%s,($%.2X)", opname, addr);
+    sprintf(tmp, "%s[$%.2X]", opname, addr);
     return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
 /* Adresses as left arg */
 op* op_l16(const char* opname, uint16_t addr, const char* right) {
-    sprintf(tmp, "%s $%.4X%s", opname, addr, right);
+    sprintf(tmp, "%s$%.4X%s", opname, addr, right);
     return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
 }
 
 op* op_lb16(const char* opname, uint16_t addr, const char* right) {
-    sprintf(tmp, "%s ($%.4X)%s", opname, addr, right);
+    sprintf(tmp, "%s[$%.4X]%s", opname, addr, right);
     return op_create(phy(pc), &(r->raw[phy(pc)]), 3, tmp);
 }
 
 op* op_l8(const char* opname, uint8_t addr, const char* right) {
-    sprintf(tmp, "%s $%.2X%s", opname, addr, right);
+    sprintf(tmp, "%s$%.2X%s", opname, addr, right);
     return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
 op* op_lb8(const char* opname, uint8_t addr, const char* right) {
-    sprintf(tmp, "%s ($%.2X)%s", opname, addr, right);
+    sprintf(tmp, "%s[$%.2X]%s", opname, addr, right);
     return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
@@ -196,7 +196,7 @@ void print_dump(FILE* f) {
         sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
     }
     for(i=0; i<call_addr.len; i++) {
-        sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
+        sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_CALL_ADDR);
     }
     sops_dump(sops, f);        
 }
@@ -208,7 +208,7 @@ void print_asm(FILE* f, const char* rom) {
         sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
     }
     for(i=0; i<call_addr.len; i++) {
-        sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_JMP_ADDR);
+        sops_set_flag(sops, jmp_addr.addr[i], OP_FLAG_CALL_ADDR);
     }
     sops_asm(sops, f, rom);    
 }
@@ -298,7 +298,8 @@ int main(int argc, char** argv) {
         printf("Could not load ROM file %s\n", argv[1]);
         return -2;
     }
-    rom_info(r);
+    
+    if(!assembly) rom_info(r);
     
     /* Init globals. */
     sops = NULL;
@@ -323,10 +324,8 @@ int main(int argc, char** argv) {
                 pc = top->pc;
                 bank = top->bank;
                 top = state_pop(top);
-            } else {
-                puts("Finished succesfully");
+            } else
                 goto finish;
-            }
         }            
            
         /* big switch interpreting the operations */
@@ -334,7 +333,7 @@ int main(int argc, char** argv) {
 #include "generated.h"
             default:
                 printf("Warning: Unknown opcode (0x%.2X) at 0x%.8X\n", r->raw[phy(pc)], phy(pc));
-                sops = sops_add(sops, op_0("-"));
+                sops = sops_add(sops, op_0("HALT"));
                 pc = start;
         }
     }

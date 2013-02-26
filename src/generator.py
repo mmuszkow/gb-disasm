@@ -80,11 +80,11 @@ for i in range(0, 0x100):
         for var in VARS:
             bvar = '(' + var + ')'
             if op[0].endswith(var):
-                name = op[0][0:len(op[0])-len(var)-1]
+                name = op[0][0:len(op[0])-len(var)]
                 print '\tsops = sops_add(sops, op_r8("%s", addr8));' % name
                 break
             elif op[0].endswith(bvar):
-                name = op[0][0:len(op[0])-len(bvar)-1]
+                name = op[0][0:len(op[0])-len(bvar)]
                 print '\tsops = sops_add(sops, op_rb8("%s", addr8));' % name
                 break
             elif bvar in op[0]:
@@ -104,11 +104,11 @@ for i in range(0, 0x100):
         for var in VARS:
             bvar = '(' + var + ')'
             if op[0].endswith(var):
-                name = op[0][0:len(op[0])-len(var)-1]
+                name = op[0][0:len(op[0])-len(var)]
                 print '\tsops = sops_add(sops, op_r16("%s", addr16));' % name
                 break
             elif op[0].endswith(bvar):
-                name = op[0][0:len(op[0])-len(bvar)-1]
+                name = op[0][0:len(op[0])-len(bvar)]
                 print '\tsops = sops_add(sops, op_rb16("%s", addr16));' % name
                 break
             elif bvar in op[0]:
