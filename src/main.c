@@ -197,6 +197,7 @@ void usage(const char* argv0) {
         "Usage: %s <ROM> -s <HEX> -b <BANK> -a -nc -nj\n"
         "<ROM> -> obligatory, ROM file to be disassembled\n"
         "  -s  -> optional, start address (PC), default is 0x100\n"
+        "  -e  -> optional, end adress (PC), default is 0x8000\n"
         "  -b  -> optional, memory bank number, default is 1\n"
         "  -a  -> optional, print assembly, default is print binary dump\n"
         "  -nc -> optional, don't follow call instructions, default is to follow\n"
