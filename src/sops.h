@@ -38,6 +38,7 @@ op* op_create(uint32_t off, const uint8_t* code, uint8_t len, const char* name) 
         oper->code[i] = code[i];
     oper->len = len;
     strcpy(oper->name, name);
+    oper->addr = 0;
     oper->flags = 0;
     oper->next = NULL;
     return oper;

@@ -56,6 +56,8 @@ addr_buff   jmp_addr;
 addr_buff   call_addr;
 /** Start address. */
 uint16_t    start;
+/** End address. */
+uint16_t    end;
 
 /** Physical address mapping. */
 uint32_t phy(uint16_t addr) {
@@ -75,7 +77,7 @@ uint16_t rel_addr(uint8_t addr) {
 
 /** Conditional jump #1. */
 void jmp16(uint16_t addr) {
-    if(addr < 0x8000 && phy(addr) < r->total) {
+    if(addr < end && phy(addr) < r->total) {
         sops_set_jmp(sops, phy(pc), phy(addr));
         top = state_push(top, pc + 3, bank);
         pc = addr;
@@ -89,7 +91,7 @@ void jmp16(uint16_t addr) {
 /** Conditional jump #2. */
 uint16_t jmp8(uint8_t addr) {
     uint16_t new_pc = rel_addr(addr);
-    if(new_pc < 0x8000) {
+    if(new_pc < end) {
         sops_set_jmp(sops, phy(pc), phy(new_pc));
         top = state_push(top, pc + 2, bank);
         pc = new_pc;
@@ -104,7 +106,7 @@ uint16_t jmp8(uint8_t addr) {
 
 /** Unconditional jump #1. */
 void jmpu16(uint16_t addr) {
-    if(addr < 0x8000 && phy(addr) < r->total) {
+    if(addr < end && phy(addr) < r->total) {
         sops_set_jmp(sops, phy(pc), phy(addr));
         pc = addr;
     } else {
@@ -117,7 +119,7 @@ void jmpu16(uint16_t addr) {
 /** Unconditional jump #2. */
 uint16_t jmpu8(uint8_t addr) {
     uint16_t new_pc = rel_addr(addr);
-    if(new_pc < 0x8000 && phy(new_pc) < r->total) {
+    if(new_pc < end && phy(new_pc) < r->total) {
         sops_set_jmp(sops, phy(pc), phy(new_pc));
         pc = new_pc;
         return new_pc;
@@ -212,9 +214,11 @@ int main(int argc, char** argv) {
     int         assembly = 0;
     int         call_follow = 1;
     int         jmp_follow = 1;
+    
+    /* Default values. */
     bank        = 1;
     start       = 0x100;
-    
+    end         = 0x8000;
 
     if(argc < 2) {
         usage(argv[0]);
@@ -242,11 +246,30 @@ int main(int argc, char** argv) {
                         return -5;
                     }
                     sscanf(argv[arg+1], "%X", &saddr);
-                    if(saddr >= 0x8000) {
-                        puts("Start address must be in range 0x0000-0x7FFF");
+                    if(saddr >= 0x4000) {
+                        puts("Start address must be in range 0x0000-0x3FFF");
                         return -6;
                     }
                     start = (uint16_t) saddr;
+                    arg += 2;
+                } else {
+                    puts("Specify the start address");
+                    usage(argv[0]);
+                    return -4;
+                }
+            } else if (strcmp(argv[arg], "-e") == 0) {
+                if(arg+1 < argc) {
+                    uint32_t eaddr;
+                    if(strstr(argv[arg+1], "0x")) {
+                        puts("Don't preceed end address with \"0x\"");
+                        return -7;
+                    }
+                    sscanf(argv[arg+1], "%X", &eaddr);
+                    if(eaddr > 0x8000) {
+                        puts("End address must be in range 0x0000-0x8000");
+                        return -8;
+                    }
+                    end = (uint16_t) eaddr;
                     arg += 2;
                 } else {
                     puts("Specify the start address");
@@ -295,6 +318,9 @@ int main(int argc, char** argv) {
 
     /* Disassembling loop. */
     while(1) {
+        /* Limit PC. */
+        if(pc >= end) pc = start;
+        
         /* Do not visit same instruction twice */
         if(sops_contains(sops, phy(pc))) {
             /* Check if we have any other possible branches to follow */
@@ -311,7 +337,7 @@ int main(int argc, char** argv) {
 #include "generated.h"
             default:
                 printf("Warning: Unknown opcode (0x%.2X) at 0x%.8X\n", r->raw[phy(pc)], phy(pc));
-                sops = sops_add(sops, op_0("HALT"));
+                sops = sops_add(sops, op_0("-"));
                 pc = start;
         }
     }

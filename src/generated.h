@@ -616,6 +616,7 @@ case 0x75:
 /* HALT */
 case 0x76:
 	sops = sops_add(sops, op_0("HALT"));
+	printf("Warning: RGBASM could not handle HALT instruction properly (0x%.8X)\n", phy(pc));
 	pc += 1;
 	break;
 /* LD [HL],A */
@@ -2226,7 +2227,7 @@ case 0xea:
 	addr16 = r->raw[phy(pc+1)] | (r->raw[phy(pc+2)]<<8);
 	sops = sops_add(sops, op_l16("LD [", addr16, "],A"));
 	if(mbc != ROM_ONLY && (addr16 == 0x2000 || addr16 == 0x2100)) {
-		printf("[0x%.8X] Bank switch to %d\n", phy(pc), bank);
+		printf("Info: Bank switch to %d at 0x%.8X\n", bank, phy(pc));
 		bank = a;
 	}
 	pc += 3;
