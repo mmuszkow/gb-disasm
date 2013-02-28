@@ -7,6 +7,7 @@
 #include "header.h"
 
 typedef struct rom {
+    char*       filename;
     uint8_t*    raw;
     uint32_t    total;
 } rom;
@@ -34,6 +35,7 @@ rom* rom_load(const char* filename) {
                 fclose(f);
                 return NULL;
             }
+            r->filename = strdup(filename);
         }
         fclose(f);
     }
@@ -42,6 +44,7 @@ rom* rom_load(const char* filename) {
 }
 
 void rom_free(rom* r) {
+    if(r->filename) free(r->filename);
     if(r->raw) free(r->raw);
     free(r);
 }

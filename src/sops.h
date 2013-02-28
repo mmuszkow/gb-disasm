@@ -3,6 +3,8 @@
 
 /** sops.h: Operations sorted by address. Sorted linked list. */
 
+#include "rom.h"
+
 /** This operation is destination of a jump instruction. */
 #define OP_FLAG_JMP_ADDR    0x01
 /** This operation is destination of a call instruction. */
@@ -153,20 +155,32 @@ void sops_dump(op* head, FILE* f) {
 }
 
 /** Disassembled code. */
-void sops_asm(op* head, FILE* f, const char* rom) {
+void sops_asm(op* head, FILE* f, rom* r) {
     char buff[16];
     op* tmp = head;
     uint32_t prev = 0;
 
-    fprintf(f, "\tSECTION \"ROM0\", HOME[0]\n");
+    fprintf(f, "SECTION \"rom0\", HOME[0]\n");
     
     while(tmp) {
         /* print data */
         if(tmp->off != prev) {
             if(prev > tmp->off)
                 fprintf(f, "\t; Something is wrong here\n");
-            else
-                fprintf(f, "\n\tINCBIN \"%s\",$%x,$%x-$%x\n", rom, prev, tmp->off, prev);
+            else {
+                int prev_bank = prev / 0x4000;
+                int tmp_bank = tmp->off / 0x4000;
+                if(prev_bank == tmp_bank) 
+                    fprintf(f, "\n\tINCBIN \"%s\",$%x,$%x-$%x\n", r->filename, prev, tmp->off, prev);
+                else {
+                    fprintf(f, "\n\tINCBIN \"%s\",$%x,$%x-$%x\n\n", 
+                        r->filename, prev, (prev_bank+1)*0x4000, prev);
+                    fprintf(f, "SECTION \"bank%d\",DATA,BANK[$%d]\n", 
+                        tmp_bank, tmp_bank);
+                    fprintf(f, "\n\tINCBIN \"%s\",$%x,$%x-$%x\n", 
+                        r->filename, (prev_bank+1)*0x4000, tmp->off, (prev_bank+1)*0x4000);
+                }
+            }
         }
         
         /* print jump or call label */
@@ -206,6 +220,18 @@ void sops_asm(op* head, FILE* f, const char* rom) {
         
         prev = tmp->off + tmp->len;
         tmp = tmp->next;
+    }
+    
+    /* add anything whats left */
+    if(prev % 0x4000 != 0) {
+        int prev_bank = prev / 0x4000;
+        fprintf(f, "\n\tINCBIN \"%s\",$%x,$%x-$%x\n", r->filename, prev, (prev_bank+1)*0x4000, prev);
+        
+        /* fill to 32KB */
+        if(prev_bank == 0) {
+            fprintf(f, "\nSECTION \"bank1\",DATA,BANK[$1]\n");
+            fprintf(f, "\tINCBIN \"%s\",$4000,$4000\n", r->filename);
+        }
     }
 }
 

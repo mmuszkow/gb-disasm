@@ -352,7 +352,7 @@ finish:
     
     /* print results */
     if(assembly) 
-        sops_asm(sops, stdout, argv[1]); 
+        sops_asm(sops, stdout, r); 
     else 
         sops_dump(sops, stdout);
 
