@@ -6,6 +6,7 @@ GameBoy ROMs disassembler.
 <pre>Usage: ./gb-disasm &lt;ROM&gt; -s &lt;HEX&gt; -b &lt;BANK&gt; -a -nc -nj
 &lt;ROM&gt; -> obligatory, ROM file to be disassembled
   -s  -> optional, start address (PC), default is 0x100
+  -e  -> optional, end adress (PC), default is 0x8000
   -b  -> optional, memory bank number, default is 1
   -a  -> optional, print assembly, default is print binary dump
   -nc -> optional, don't follow call instructions, default is to follow
