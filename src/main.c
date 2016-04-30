@@ -3,6 +3,7 @@
 #include "sops.h"
 #include "state.h"
 #include "addr_buff.h"
+#include "io.h"
 
 /*
     $FFFF           Interrupt Enable Flag
@@ -183,7 +184,7 @@ op* op_lb16(const char* opname, uint16_t addr, const char* right) {
 }
 
 op* op_l8(const char* opname, uint8_t addr, const char* right) {
-    sprintf(tmp, "%s$%.2X%s", opname, addr, right);
+    sprintf(tmp, "%s$%.2X%s ; %s", opname, addr, right, io_name(addr));
     return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }
 
