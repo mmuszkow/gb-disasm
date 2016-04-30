@@ -184,6 +184,7 @@ op* op_lb16(const char* opname, uint16_t addr, const char* right) {
 }
 
 op* op_l8(const char* opname, uint8_t addr, const char* right) {
+	/* this function is used only by the LDH instruction */
     sprintf(tmp, "%s$%.2X%s ; %s", opname, addr, right, io_name(addr));
     return op_create(phy(pc), &(r->raw[phy(pc)]), 2, tmp);
 }

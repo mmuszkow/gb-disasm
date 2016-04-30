@@ -1,7 +1,8 @@
 #ifndef __GB_DASM_IO__H__
 #define __GB_DASM_IO__H__
 
-static const char* io_register_names[0x80] = {
+/** I/O registers names used for LDH instruction comments. */
+static const char* IO_REGISTER_NAMES[0x80] = {
   /* 0x00 */
   "P1/JOYP",
   "SB",
@@ -141,13 +142,9 @@ static const char* io_register_names[0x80] = {
 };
 
 const char* io_name(uint8_t addr) {
-    if (addr == 0xff) {
-        return "IE";
-    }
-    if (addr >= 0x80) {
-        return "HIMEM";
-    }
-    return io_register_names[addr];
+    if (addr == 0xff) return "IE";
+    if (addr >= 0x80) return "HIMEM";
+    return IO_REGISTER_NAMES[addr];
 }
 
 #endif
