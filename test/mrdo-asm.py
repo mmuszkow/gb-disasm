@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 
 # This is unfinished script to convert Mr.Do! source code to format acceptable by rgbasm
 
