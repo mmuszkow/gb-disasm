@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # Generater code from opcodes from http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html
 
 import re
