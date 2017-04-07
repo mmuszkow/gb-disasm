@@ -83,9 +83,9 @@ case 0xf:
 	sops = sops_add(sops, op_0("RRCA"));
 	pc += 1;
 	break;
-/* STOP 0 */
+/* STOP */
 case 0x10:
-	addr8 = r->raw[phy(pc+1)];
+	sops = sops_add(sops, op_0("STOP"));
 	pc += 2;
 	break;
 /* LD DE,d16 */
